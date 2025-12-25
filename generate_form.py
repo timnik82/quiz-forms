@@ -371,13 +371,29 @@ def main():
 
     try:
         service = authorize()
+    except ModuleNotFoundError as e:
+        print(f"Missing Google dependencies: {e}. Install google-api-python-client/google-auth-oauthlib.", file=sys.stderr)
+        sys.exit(1)
+    except OSError as e:
+        print(f"OAuth credential/token error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    from googleapiclient.errors import HttpError
+
+    try:
         form = service.forms().create(body=create_body).execute()
-        service.forms().batchUpdate(formId=form["formId"], body={"requests": requests}).execute()
-        result = service.forms().get(formId=form["formId"]).execute()
-    except Exception as e:
+        form_id = form.get("formId")
+        if not form_id:
+            print("Google API error: missing formId in response", file=sys.stderr)
+            sys.exit(1)
+
+        service.forms().batchUpdate(formId=form_id, body={"requests": requests}).execute()
+        result = service.forms().get(formId=form_id).execute()
+    except HttpError as e:
         print(f"Google API error: {e}", file=sys.stderr)
         sys.exit(1)
-    print(json.dumps({"formId": form["formId"], "responderUri": result["responderUri"]}, indent=2))
+
+    print(json.dumps({"formId": form_id, "responderUri": result.get("responderUri", "")}, indent=2))
 
 
 if __name__ == "__main__":

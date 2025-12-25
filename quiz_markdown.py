@@ -155,5 +155,6 @@ def parse_quiz_markdown(markdown: str) -> list[dict]:
             continue
 
     flush_question()
+    flush_section()
 
     return sections

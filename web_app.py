@@ -133,7 +133,7 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             fields, files = _parse_multipart_form_data(content_type, body)
-        except Exception as e:
+        except ValueError as e:
             self.send_error(HTTPStatus.BAD_REQUEST, f"Could not parse multipart body: {e}")
             return
 
@@ -147,14 +147,14 @@ class Handler(BaseHTTPRequestHandler):
         try:
             raw = files["file"]["data"]
             markdown = raw.decode("utf-8")
-        except Exception as e:
+        except UnicodeDecodeError as e:
             self.send_error(HTTPStatus.BAD_REQUEST, f"Could not read uploaded file: {e}")
             return
 
         try:
             sections = parse_quiz_markdown(markdown)
             requests = build_requests_from_sections(sections)
-        except Exception as e:
+        except ValueError as e:
             self.send_error(HTTPStatus.BAD_REQUEST, f"Could not parse markdown: {e}")
             return
 
@@ -179,10 +179,24 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             service = authorize()
+        except ModuleNotFoundError as e:
+            self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Missing Google dependencies: {e}")
+            return
+        except OSError as e:
+            self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"OAuth credential/token error: {e}")
+            return
+
+        from googleapiclient.errors import HttpError
+
+        try:
             form_obj = service.forms().create(body=create_body).execute()
-            service.forms().batchUpdate(formId=form_obj["formId"], body={"requests": requests}).execute()
-            result = service.forms().get(formId=form_obj["formId"]).execute()
-        except Exception as e:
+            form_id = form_obj.get("formId")
+            if not form_id:
+                self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, "Google API error: missing formId in response")
+                return
+            service.forms().batchUpdate(formId=form_id, body={"requests": requests}).execute()
+            result = service.forms().get(formId=form_id).execute()
+        except HttpError as e:
             self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Google API error: {e}")
             return
 
