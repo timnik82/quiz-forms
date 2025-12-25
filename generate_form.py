@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
 import argparse
+import json
+import sys
+from pathlib import Path
+from typing import Any
 
 from quiz_markdown import parse_quiz_markdown
 
@@ -109,7 +111,7 @@ short_answers = [
 ]
 
 
-def authorize() -> any:
+def authorize() -> Any:
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
@@ -240,7 +242,7 @@ def build_requests() -> list[dict]:
 
 def _normalize_choice_answer(answer: str, options: list[str]) -> str | None:
     a = answer.strip()
-    if len(a) == 1 and "A" <= a.upper() <= "H":
+    if len(a) == 1 and "A" <= a.upper() <= "Z":
         idx = ord(a.upper()) - ord("A")
         if 0 <= idx < len(options):
             return options[idx]
@@ -351,7 +353,12 @@ def main():
 
     create_body = {"info": {"title": args.title}}
     if args.input:
-        sections = parse_quiz_markdown(args.input.read_text(encoding="utf-8"))
+        try:
+            content = args.input.read_text(encoding="utf-8")
+        except OSError as e:
+            print(f"Error reading {args.input}: {e}", file=sys.stderr)
+            sys.exit(1)
+        sections = parse_quiz_markdown(content)
         requests = build_requests_from_sections(sections)
     else:
         requests = build_requests()
@@ -362,10 +369,14 @@ def main():
         print(json.dumps({"create": create_body, "batchUpdate": {"requests": requests}}, indent=2))
         return
 
-    service = authorize()
-    form = service.forms().create(body=create_body).execute()
-    service.forms().batchUpdate(formId=form["formId"], body={"requests": requests}).execute()
-    result = service.forms().get(formId=form["formId"]).execute()
+    try:
+        service = authorize()
+        form = service.forms().create(body=create_body).execute()
+        service.forms().batchUpdate(formId=form["formId"], body={"requests": requests}).execute()
+        result = service.forms().get(formId=form["formId"]).execute()
+    except Exception as e:
+        print(f"Google API error: {e}", file=sys.stderr)
+        sys.exit(1)
     print(json.dumps({"formId": form["formId"], "responderUri": result["responderUri"]}, indent=2))
 
 

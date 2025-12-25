@@ -12,6 +12,9 @@ from generate_form import authorize, build_requests_from_sections, quiz_settings
 from quiz_markdown import parse_quiz_markdown
 
 
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MiB
+
+
 def _parse_content_type(value: str) -> tuple[str, dict[str, str]]:
     parts = [p.strip() for p in value.split(";") if p.strip()]
     ctype = parts[0].lower() if parts else ""
@@ -122,6 +125,9 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             self.send_error(HTTPStatus.BAD_REQUEST, "Invalid Content-Length")
+            return
+        if length > MAX_UPLOAD_SIZE:
+            self.send_error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "Upload too large")
             return
         body = self.rfile.read(length)
 

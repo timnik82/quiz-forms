@@ -5,7 +5,7 @@ import re
 
 _HEADING_RE = re.compile(r"^\s{0,3}(#{1,6})\s+(.*)$")
 _BOLD_LINE_RE = re.compile(r"^\s*\*\*(.+?)\*\*\s*$")
-_OPTION_RE = re.compile(r"^\s*([A-H])[\.)]\s+(.*)$")
+_OPTION_RE = re.compile(r"^\s*([A-Z])[\.)]\s+(.*)$")
 _ANSWER_RE = re.compile(r"^\s*(?:\*\*)?(?:answer|correct\s*answer|ans)\s*[:：]\s*(.+?)\s*(?:\*\*)?\s*$", re.IGNORECASE)
 
 
@@ -15,7 +15,8 @@ def _strip_inline_md(text: str) -> str:
         text = text[2:-2].strip()
     if text.startswith("*") and text.endswith("*") and len(text) >= 2:
         text = text[1:-1].strip()
-    text = text.replace("**", "").replace("*", "")
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"(?<!\*)\*(.+?)\*(?!\*)", r"\1", text)
     text = text.replace("\\.", ".")
     return re.sub(r"\s+", " ", text).strip()
 
