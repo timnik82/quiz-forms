@@ -348,13 +348,15 @@ def main():
     parser = argparse.ArgumentParser(description="Create a Google Forms quiz.")
     parser.add_argument("--dry-run", action="store_true", help="Print the Google Forms API payloads without creating a form")
     parser.add_argument("--title", default=QUIZ_TITLE, help="Form title")
-    parser.add_argument("--input", type=Path, help="Path to a markdown quiz file to convert")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--input", type=Path, help="Path to a markdown quiz file to convert")
+    group.add_argument("--use-built-in", action="store_true", help="Use the built-in example quiz content")
     args = parser.parse_args()
 
     create_body = {"info": {"title": args.title}}
     if args.input:
         try:
-            content = args.input.read_text(encoding="utf-8")
+            content = args.input.read_text(encoding="utf-8-sig")
         except OSError as e:
             print(f"Error reading {args.input}: {e}", file=sys.stderr)
             sys.exit(1)
@@ -373,6 +375,9 @@ def main():
         service = authorize()
     except ModuleNotFoundError as e:
         print(f"Missing Google dependencies: {e}. Install google-api-python-client/google-auth-oauthlib.", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError as e:
+        print(f"Missing credentials.json: {e}", file=sys.stderr)
         sys.exit(1)
     except OSError as e:
         print(f"OAuth credential/token error: {e}", file=sys.stderr)

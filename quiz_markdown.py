@@ -130,13 +130,6 @@ def parse_quiz_markdown(markdown: str) -> list[dict]:
                 sections.append(current_section)
                 continue
 
-        if stripped.startswith("###"):
-            # e.g. ### **1\. Question**
-            title = _strip_inline_md(stripped.lstrip("#").strip())
-            flush_question()
-            current_question = {"title": title}
-            continue
-
         if current_question is None:
             continue
 

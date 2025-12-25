@@ -90,7 +90,7 @@ def _index_page() -> str:
     <label>Markdown file: <input type=\"file\" name=\"file\" accept=\".md,text/markdown,text/plain\" required /></label>
   </div>
   <div>
-    <label><input type=\"checkbox\" name=\"dry_run\" value=\"1\" checked /> Dry run (don’t create a form)</label>
+    <label><input type=\"checkbox\" name=\"dry_run\" value=\"1\" checked /> Dry run (don't create a form)</label>
   </div>
   <div>
     <button type=\"submit\">Create</button>
@@ -146,7 +146,7 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             raw = files["file"]["data"]
-            markdown = raw.decode("utf-8")
+            markdown = raw.decode("utf-8-sig")
         except UnicodeDecodeError as e:
             self.send_error(HTTPStatus.BAD_REQUEST, f"Could not read uploaded file: {e}")
             return
@@ -181,6 +181,9 @@ class Handler(BaseHTTPRequestHandler):
             service = authorize()
         except ModuleNotFoundError as e:
             self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Missing Google dependencies: {e}")
+            return
+        except FileNotFoundError as e:
+            self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Missing credentials.json: {e}")
             return
         except OSError as e:
             self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"OAuth credential/token error: {e}")
