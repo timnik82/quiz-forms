@@ -133,7 +133,7 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             fields, files = _parse_multipart_form_data(content_type, body)
-        except ValueError as e:
+        except (ValueError, TypeError) as e:
             self.send_error(HTTPStatus.BAD_REQUEST, f"Could not parse multipart body: {e}")
             return
 
@@ -201,6 +201,9 @@ class Handler(BaseHTTPRequestHandler):
             result = service.forms().get(formId=form_id).execute()
         except HttpError as e:
             self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Google API error: {e}")
+            return
+        except (OSError, TimeoutError, ConnectionError) as e:
+            self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Google API/network error: {e}")
             return
 
         responder_uri = result.get("responderUri", "")
