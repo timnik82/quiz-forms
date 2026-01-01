@@ -78,9 +78,12 @@ function parseQuizText(text) {
   
   const HEADING_RE = /^#{1,6}\s+(.*)$/;
   const BOLD_LINE_RE = /^\*\*(.+?)\*\*\s*$/;
-  const OPTION_RE = /^\s*([A-H])[\.)]\s+(.*)$/;
+  // Match options like "A." or "A)" with optional space after the delimiter (case-insensitive)
+  const OPTION_RE = /^([A-Ha-h])[\.)]\s*(.*)$/i;
   const ANSWER_RE = /^\s*(?:\*\*)?(?:answer|correct\s*answer|ans)\s*[:：]\s*(.+?)\s*(?:\*\*)?\s*$/i;
   const QUESTION_NUM_RE = /^\d+\s*[\.:)]\s*/;
+  // Detect section headers like "Part 1", "Part 2", "Section 1" etc.
+  const SECTION_HEADER_RE = /^(part|section)\s+\d+/i;
   
   function stripMarkdown(str) {
     return str.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\\\./g, '.').replace(/\s+/g, ' ').trim();
@@ -92,6 +95,10 @@ function parseQuizText(text) {
     if (t.includes('short') && t.includes('answer')) return 'short_answer';
     if (t.includes('multiple') && t.includes('choice')) return 'multiple_choice';
     return null;
+  }
+  
+  function isSectionHeader(text) {
+    return SECTION_HEADER_RE.test(text);
   }
   
   function flushQuestion() {
@@ -145,7 +152,7 @@ function parseQuizText(text) {
       const level = (stripped.match(/^#+/) || [''])[0].length;
       const text = stripMarkdown(headingMatch[1]);
       
-      if (level <= 2) {
+      if (level <= 2 || (level === 3 && isSectionHeader(text))) {
         flushQuestion();
         currentSection = { title: text, kind: getSectionKind(text), questions: [] };
         sections.push(currentSection);
@@ -160,14 +167,17 @@ function parseQuizText(text) {
       }
     }
     
-    // Check for bold section header
+    // Check for bold section header (only if it looks like a section title, not a question)
     const boldMatch = stripped.match(BOLD_LINE_RE);
-    if (boldMatch && !currentQuestion) {
+    if (boldMatch) {
       const text = stripMarkdown(boldMatch[1]);
-      flushQuestion();
-      currentSection = { title: text, kind: getSectionKind(text), questions: [] };
-      sections.push(currentSection);
-      continue;
+      // Only treat as section header if it contains "Part" or "Section"
+      if (isSectionHeader(text)) {
+        flushQuestion();
+        currentSection = { title: text, kind: getSectionKind(text), questions: [] };
+        sections.push(currentSection);
+        continue;
+      }
     }
     
     // Check for question number at start of line
@@ -186,7 +196,7 @@ function parseQuizText(text) {
       continue;
     }
     
-    // Check for option (A. B. C. etc)
+    // Check for option (A. B. C. etc) - stripped already removes leading whitespace
     const optionMatch = stripped.match(OPTION_RE);
     if (optionMatch) {
       currentOptions.push(stripMarkdown(optionMatch[2]));
