@@ -78,8 +78,8 @@ function parseQuizText(text) {
   
   const HEADING_RE = /^#{1,6}\s+(.*)$/;
   const BOLD_LINE_RE = /^\*\*(.+?)\*\*\s*$/;
-  // Match options like "A." or "A)" with any amount of leading whitespace
-  const OPTION_RE = /^([A-H])[\.)]\s*(.*)$/;
+  // Match options like "A." or "A)" with optional space after the delimiter (case-insensitive)
+  const OPTION_RE = /^([A-Ha-h])[\.)]\s*(.*)$/i;
   const ANSWER_RE = /^\s*(?:\*\*)?(?:answer|correct\s*answer|ans)\s*[:：]\s*(.+?)\s*(?:\*\*)?\s*$/i;
   const QUESTION_NUM_RE = /^\d+\s*[\.:)]\s*/;
   // Detect section headers like "Part 1", "Part 2", "Section 1" etc.
