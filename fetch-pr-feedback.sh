@@ -72,10 +72,11 @@ load_env_fallback() {
             ''|\#*) continue ;;
         esac
 
-        # Support optional leading "export ".
+        # Support optional leading "export".
         if [[ "$line" =~ ^[[:space:]]*export[[:space:]]+ ]]; then
-            line="${line#export }"
-            line="${line#export\t}"
+            line="${line#"${line%%[![:space:]]*}"}"  # strip leading whitespace
+            line="${line#export}"                     # strip "export"
+            line="${line#"${line%%[![:space:]]*}"}"  # strip whitespace after export
         fi
 
         # KEY=VALUE only.
@@ -275,7 +276,8 @@ search_prs_api() {
 
     # URL encode the search query
     local query="repo:$GITHUB_REPO is:pr $search_term in:branch"
-    local encoded_query=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$query'))")
+    local encoded_query
+    encoded_query=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$query")
 
     api_get "/search/issues?q=$encoded_query&per_page=20" \
         | python3 -c "
