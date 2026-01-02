@@ -141,6 +141,7 @@ def authorize() -> Any:
             flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
             creds = flow.run_local_server(port=0)
         token_path.write_text(creds.to_json())
+        token_path.chmod(0o600)
     return build("forms", "v1", credentials=creds)
 
 

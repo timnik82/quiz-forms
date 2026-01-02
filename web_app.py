@@ -130,6 +130,12 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             self.send_error(HTTPStatus.BAD_REQUEST, "Invalid Content-Length")
             return
+
+        max_upload_size = 10 * 1024 * 1024  # 10 MB
+        if length > max_upload_size:
+            self.send_error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "Upload too large")
+            return
+
         body = self.rfile.read(length)
 
         try:
