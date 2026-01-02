@@ -69,6 +69,8 @@ function previewQuiz() {
 // ============ PARSER ============
 
 function parseQuizText(text) {
+  // Strip BOM (Byte Order Mark) that Google Docs may add
+  text = text.replace(/^\uFEFF/, '');
   const lines = text.split('\n');
   const sections = [];
   let currentSection = null;
