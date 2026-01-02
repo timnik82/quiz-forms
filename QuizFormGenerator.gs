@@ -76,14 +76,20 @@ function parseQuizText(text) {
   let currentOptions = [];
   let currentAnswer = null;
   
+  // Markdown heading (for .md files)
   const HEADING_RE = /^#{1,6}\s+(.*)$/;
+  // Markdown bold line
   const BOLD_LINE_RE = /^\*\*(.+?)\*\*\s*$/;
   // Match options like "A." or "A)" with optional space after the delimiter (case-insensitive)
   const OPTION_RE = /^([A-Ha-h])[\.)]\s*(.*)$/i;
+  // Answer line
   const ANSWER_RE = /^\s*(?:\*\*)?(?:answer|correct\s*answer|ans)\s*[:：]\s*(.+?)\s*(?:\*\*)?\s*$/i;
+  // Question number at start
   const QUESTION_NUM_RE = /^\d+\s*[\.:)]\s*/;
-  // Detect section headers like "Part 1", "Part 2", "Section 1" etc.
+  // Detect section headers like "Part 1", "Part 2", "Section 1" etc. (works for both plain text and markdown)
   const SECTION_HEADER_RE = /^(part|section)\s+\d+/i;
+  // Google Docs horizontal rule (underscores)
+  const GDOC_HR_RE = /^[_]{3,}$/;
   
   function stripMarkdown(str) {
     return str.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\\\./g, '.').replace(/\s+/g, ' ').trim();
@@ -144,9 +150,10 @@ function parseQuizText(text) {
     const line = lines[i];
     const stripped = line.trim();
     
-    if (!stripped || stripped.match(/^-{3,}$/)) continue;
+    // Skip empty lines, markdown HRs (---), and Google Docs HRs (___)
+    if (!stripped || stripped.match(/^-{3,}$/) || GDOC_HR_RE.test(stripped)) continue;
     
-    // Check for heading (# or ## or ###)
+    // Check for markdown heading (# or ## or ###)
     const headingMatch = stripped.match(HEADING_RE);
     if (headingMatch) {
       const level = (stripped.match(/^#+/) || [''])[0].length;
@@ -167,11 +174,19 @@ function parseQuizText(text) {
       }
     }
     
-    // Check for bold section header (only if it looks like a section title, not a question)
+    // Check for plain text section header (e.g., "Part 1 – Multiple choice")
+    // This handles Google Docs plain text format
+    if (isSectionHeader(stripped)) {
+      flushQuestion();
+      currentSection = { title: stripped, kind: getSectionKind(stripped), questions: [] };
+      sections.push(currentSection);
+      continue;
+    }
+    
+    // Check for markdown bold section header
     const boldMatch = stripped.match(BOLD_LINE_RE);
     if (boldMatch) {
       const text = stripMarkdown(boldMatch[1]);
-      // Only treat as section header if it contains "Part" or "Section"
       if (isSectionHeader(text)) {
         flushQuestion();
         currentSection = { title: text, kind: getSectionKind(text), questions: [] };
@@ -180,11 +195,15 @@ function parseQuizText(text) {
       }
     }
     
-    // Check for question number at start of line
-    if (!currentQuestion && stripped.match(/^\d+\s*[\.:)]/)) {
-      flushQuestion();
-      currentQuestion = { title: stripMarkdown(stripped) };
-      continue;
+    // Check for question number at start of line (e.g., "1. What is...")
+    if (stripped.match(/^\d+\s*[\.:)]/)) {
+      // Don't start a new question if this looks like an option line that happens to start with a number
+      // Only treat as question if it doesn't match option pattern
+      if (!OPTION_RE.test(stripped)) {
+        flushQuestion();
+        currentQuestion = { title: stripMarkdown(stripped) };
+        continue;
+      }
     }
     
     if (!currentQuestion) continue;
@@ -196,7 +215,7 @@ function parseQuizText(text) {
       continue;
     }
     
-    // Check for option (A. B. C. etc) - stripped already removes leading whitespace
+    // Check for option (A. B. C. etc)
     const optionMatch = stripped.match(OPTION_RE);
     if (optionMatch) {
       currentOptions.push(stripMarkdown(optionMatch[2]));
