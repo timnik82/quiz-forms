@@ -1,6 +1,6 @@
 # Quiz Form Generator - Setup Guide
 
-Convert any Google Doc with questions into a Google Forms quiz in seconds.
+Convert a Google Doc with questions into a Google Forms quiz in seconds.
 
 ## Quick Setup (5 minutes)
 
@@ -26,32 +26,30 @@ Go to **Extensions** → **Apps Script**
 
 ## Document Format
 
-Your Google Doc should follow this format:
+This script reads your **Google Doc text**. You can write questions as plain text; formatting like headings/bold is optional.
+
+Your Google Doc should follow a structure like this:
 
 ```
-**Part 1 – Multiple Choice**
+Part 1 – Multiple Choice
 
-### 1. What is 2 + 2?
+1. What is 2 + 2?
 A. 3
 B. 4
 C. 5
 D. 6
 
-Answer: B
+---
+
+Part 2 – True/False
+
+2. The sky is blue.
 
 ---
 
-**Part 2 – True/False**
+Part 3 – Short Answer
 
-### 2. The sky is blue.
-
-Answer: True
-
----
-
-**Part 3 – Short Answer**
-
-### 3. Explain photosynthesis in one sentence.
+3. Explain photosynthesis in one sentence.
 ```
 
 ### Supported Question Types:
