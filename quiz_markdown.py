@@ -6,7 +6,10 @@ import re
 _HEADING_RE = re.compile(r"^\s{0,3}(#{1,6})\s+(.*)$")
 _BOLD_LINE_RE = re.compile(r"^\s*\*\*(.+?)\*\*\s*$")
 _OPTION_RE = re.compile(r"^\s*([A-H])[\.)]\s+(.*)$")
-_ANSWER_RE = re.compile(r"^\s*(?:\*\*)?(?:answer|correct\s*answer|ans)\s*[:：]\s*(.+?)\s*(?:\*\*)?\s*$", re.IGNORECASE)
+_ANSWER_RE = re.compile(
+    r"^\s*(?:\*\*)?(?:answer|correct\s*answer|ans)\s*[:：]\s*(.+?)\s*(?:\*\*)?\s*$",
+    re.IGNORECASE,
+)
 
 
 def _strip_inline_md(text: str) -> str:
@@ -46,7 +49,12 @@ def parse_quiz_markdown(markdown: str) -> list[dict]:
     saw_short_answer_prompt = False
 
     def flush_question() -> None:
-        nonlocal current_question, current_options, current_answer, saw_short_answer_prompt, current_section
+        nonlocal \
+            current_question, \
+            current_options, \
+            current_answer, \
+            saw_short_answer_prompt, \
+            current_section
         if not current_question:
             return
 
@@ -107,7 +115,11 @@ def parse_quiz_markdown(markdown: str) -> list[dict]:
                 flush_question()
                 if current_section is not None:
                     flush_section()
-                current_section = {"title": text, "kind": _section_kind(text), "questions": []}
+                current_section = {
+                    "title": text,
+                    "kind": _section_kind(text),
+                    "questions": [],
+                }
                 sections.append(current_section)
                 continue
 
@@ -125,7 +137,11 @@ def parse_quiz_markdown(markdown: str) -> list[dict]:
                 flush_question()
                 if current_section is not None:
                     flush_section()
-                current_section = {"title": text, "kind": _section_kind(text), "questions": []}
+                current_section = {
+                    "title": text,
+                    "kind": _section_kind(text),
+                    "questions": [],
+                }
                 sections.append(current_section)
                 continue
 

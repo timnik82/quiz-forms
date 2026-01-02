@@ -1,0 +1,35 @@
+name: Lint and Type Check
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Ruff
+        run: pipx install ruff
+
+      - name: Lint Python with Ruff
+        run: ruff check --output-format=github .
+
+      - name: Check Python formatting with Ruff
+        run: ruff format --check --diff .
+
+      - name: Install mypy
+        run: pip install mypy types-requests
+
+      - name: Type check with mypy
+        run: mypy --ignore-missing-imports *.py
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Lint shell scripts
+        run: shellcheck fetch-pr-feedback.sh
