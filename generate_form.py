@@ -156,24 +156,26 @@ def build_requests() -> list[dict]:
         }
     )
     idx += 1
-    for q in multiple_choice:
+    for mc_q in multiple_choice:
         requests.append(
             {
                 "createItem": {
                     "item": {
-                        "title": q["title"],
+                        "title": mc_q["title"],
                         "questionItem": {
                             "question": {
                                 "required": True,
                                 "grading": {
                                     "pointValue": 1,
                                     "correctAnswers": {
-                                        "answers": [{"value": q["answer"]}]
+                                        "answers": [{"value": mc_q["answer"]}]
                                     },
                                 },
                                 "choiceQuestion": {
                                     "type": "RADIO",
-                                    "options": [{"value": opt} for opt in q["options"]],
+                                    "options": [
+                                        {"value": opt} for opt in mc_q["options"]
+                                    ],
                                     "shuffle": False,
                                 },
                             }
@@ -194,19 +196,19 @@ def build_requests() -> list[dict]:
         }
     )
     idx += 1
-    for q in true_false:  # type: ignore[assignment]
+    for tf_q in true_false:
         requests.append(
             {
                 "createItem": {
                     "item": {
-                        "title": q["title"],
+                        "title": tf_q["title"],
                         "questionItem": {
                             "question": {
                                 "required": True,
                                 "grading": {
                                     "pointValue": 1,
                                     "correctAnswers": {
-                                        "answers": [{"value": q["answer"]}]
+                                        "answers": [{"value": tf_q["answer"]}]
                                     },
                                 },
                                 "choiceQuestion": {

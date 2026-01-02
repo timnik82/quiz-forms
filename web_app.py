@@ -135,9 +135,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             fields, files = _parse_multipart_form_data(content_type, body)
         except Exception as e:
-            self.send_error(
-                HTTPStatus.BAD_REQUEST, f"Could not parse multipart body: {e}"
-            )
+            self.log_error("Could not parse multipart body: %s", e)
+            self.send_error(HTTPStatus.BAD_REQUEST, "Could not parse multipart body")
             return
 
         title = (fields.get("title") or "Quiz").strip() or "Quiz"
@@ -151,9 +150,8 @@ class Handler(BaseHTTPRequestHandler):
             raw = files["file"]["data"]
             markdown = raw.decode("utf-8")
         except Exception as e:
-            self.send_error(
-                HTTPStatus.BAD_REQUEST, f"Could not read uploaded file: {e}"
-            )
+            self.log_error("Could not read uploaded file: %s", e)
+            self.send_error(HTTPStatus.BAD_REQUEST, "Could not read uploaded file")
             return
 
         try:

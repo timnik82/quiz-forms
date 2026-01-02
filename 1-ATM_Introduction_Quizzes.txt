@@ -1,0 +1,196 @@
+﻿1. What are the three main pillars of Air Traffic Management (ATM)?
+A. ATC, AIS, MET
+B. ATS, ASM, ATFM
+C. ACC, APP, TWR
+D. FIS, ATC, Alerting Service
+________________
+2. Which organization establishes global aviation standards?
+A. EUROCONTROL
+B. EASA
+C. ICAO
+D. IATA
+________________
+3. What is the primary objective of Air Traffic Services (ATS)?
+A. Reduce noise
+B. Ensure safe and orderly flow of air traffic
+C. Improve airline profitability
+D. Manage drone operations
+________________
+4. What is the responsibility of an Area Control Centre (ACC)?
+A. Tower operations at airports
+B. En-route traffic management
+C. Meteorological reporting
+D. Cargo handling
+________________
+5. Class A airspace allows:
+A. Only VFR
+B. Only IFR
+C. IFR and VFR
+D. No flights
+________________
+6. A Flight Information Region (FIR) provides:
+A. ATC only
+B. FIS and alerting service
+C. Customs service
+D. Airport slot allocation
+________________
+7. What is the goal of ATFM?
+A. Manage pilot training
+B. Balance demand and capacity
+C. Assign runway exits
+D. Provide radar surveillance
+________________
+8. Flexible Use of Airspace (FUA) aims to:
+A. Reserve all military airspace permanently
+B. Allow shared civil-military use
+C. Remove ATCO responsibility
+D. Prevent drone operations
+________________
+9. Which body acts as the Network Manager in Europe?
+A. ICAO
+B. EUROCONTROL
+C. EASA
+D. FAA
+________________
+10. GAT refers to:
+A. General Aviation Traffic
+B. General Air Traffic operating under ICAO rules
+C. Government Air Transport
+D. Ground Access Traffic
+________________
+________________
+True / False Questions (11–15)
+11. FIS is responsible for providing information useful for safe and efficient flight operations.
+(True/False)
+12. VFR flights require continuous visual reference to the ground.
+(True/False)
+13. ATM includes both airborne and ground-based functions.
+(True/False)
+14. Airspace classes are standardized worldwide by ICAO.
+(True/False)
+15. Alerting service is provided only to aircraft in distress.
+(True/False)
+________________
+________________
+Advanced Questions (16–20)
+(Short Answer or Advanced MCQ)
+16. Short Answer:
+Explain the difference between a CTR and a TMA.
+________________
+17. Short Answer:
+Why is ASM (Airspace Management) divided into strategic, pre-tactical, and tactical levels?
+________________
+18. Advanced MCQ – Which KPA (Key Performance Area) focuses on minimizing variability in operations?
+A. Capacity
+B. Predictability
+C. Environment
+D. Security
+________________
+19. Short Answer:
+What is a CTOT, and why is it important?
+________________
+20. Advanced MCQ – Which of the following best describes the relationship between ICAO and national regulations?
+A. ICAO rules override all national laws
+B. National laws always override ICAO
+C. ICAO provides standards; states implement them through national regulation
+D. ICAO approves all national aviation regulations
+________________
+________________
+ANSWER KEY
+Multiple-Choice Answers (1–10)
+1. B – ATS, ASM, ATFM
+
+2. C – ICAO
+
+3. B – Ensure safe and orderly traffic
+
+4. B – En-route ATC
+
+5. B – IFR only
+
+6. B – FIS + alerting service
+
+7. B – Balance demand and capacity
+
+8. B – Shared civil-military use
+
+9. B – EUROCONTROL
+
+10. B – General Air Traffic under ICAO rules
+
+________________
+True/False Answers (11–15)
+   11. True
+
+   12. True
+
+   13. True
+
+   14. True (classes A–G are ICAO standard)
+
+   15. False – Also to aircraft unsure of position or facing emergencies
+
+________________
+Advanced Answers (16–20)
+      16. CTR vs TMA:
+A CTR (Control Zone) extends from the surface around an airport;
+A TMA (Terminal Control Area) overlies several CTRs and manages arriving/departing traffic at higher altitudes.
+
+________________
+         17. Reason for ASM levels:
+Traffic demand, military activity, and weather evolve over time; ASM levels allow planning days in advance (strategic), refining the day before (pre-tactical), and adapting in real time (tactical).
+
+________________
+            18. Correct Answer: B — Predictability
+
+________________
+               19. CTOT meaning:
+A Calculated Take-Off Time used in ATFM to manage departures in periods of high demand; ensures orderly flow and avoids overloading sectors.
+
+________________
+                  20. Correct Answer: C — ICAO provides standards; states implement them
+ATM Introduction – Quizzes and Answer Keys
+Quiz 1 (Basic Level)
+1. Which three major services constitute Air Traffic Management (ATM)?
+2. What is the main objective of Air Traffic Services (ATS)?
+3. What does ICAO stand for?
+4. Name two ATS units that provide Air Traffic Control.
+5. True or False: ECAC has 44 member states.
+6. What is the objective of Air Traffic Flow Management (ATFM)?
+7. What distinguishes IFR from VFR?
+8. What does a Flight Information Region (FIR) provide?
+9. True or False: Class A airspace allows both VFR and IFR flights.
+10. What organization acts as the Network Manager in Europe?
+Answer Key – Quiz 1
+1. ATS, ASM, ATFM
+2. Prevent collisions and ensure orderly flow of air traffic.
+3. International Civil Aviation Organization.
+4. ACC, APP, TWR.
+5. True.
+6. Ensure safe, orderly, and efficient flow of air traffic by balancing demand and capacity.
+7. IFR uses instrument-based navigation; VFR requires visual conditions.
+8. Provides FIS and alerting services.
+9. False. Class A allows IFR only.
+10. EUROCONTROL.
+Quiz 2 (Advanced Level)
+1. Explain the relationship between ICAO standards and national regulations.
+2. Describe the main tasks of the European Network Manager.
+3. What is the purpose of the Flexible Use of Airspace (FUA)?
+4. How do CTAs and CTRs differ?
+5. What is the function of the Airspace Management Cell (AMC)?
+6. Describe the three levels of ASM.
+7. What is the purpose of an ATFM slot (CTOT)?
+8. Name and explain two KPAs defined by ICAO.
+9. What is the difference between ATFM and ATFCM?
+10. What type of flights belong to Operational Air Traffic (OAT) and why?
+Answer Key – Quiz 2
+1. ICAO provides global standards; national regulations always take precedence in each state.
+2. Route network design, coordination of scarce resources, ATFM function, transponder code management.
+3. To maximize efficient shared use of airspace between civil and military users.
+4. CTA extends upward from a defined altitude; CTR extends from the ground up.
+5. Day-to-day allocation and coordination of national airspace.
+6. Level 1 strategic, Level 2 pre-tactical, Level 3 tactical real-time management.
+7. To manage departures during demand/capacity imbalances (±5 to +10 min tolerance).
+8. Safety, Capacity, Efficiency, Environmental sustainability.
+9. ATFM balances demand with fixed capacity; ATFCM develops measures to increase capacity.
+10. Mainly military flights operating under special rules rather than ICAO rules.
