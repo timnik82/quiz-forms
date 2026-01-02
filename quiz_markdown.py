@@ -7,7 +7,7 @@ _HEADING_RE = re.compile(r"^\s{0,3}(#{1,6})\s+(.*)$")
 _BOLD_LINE_RE = re.compile(r"^\s*\*\*(.+?)\*\*\s*$")
 _OPTION_RE = re.compile(r"^\s*([A-H])[\.)]\s+(.*)$")
 _ANSWER_RE = re.compile(
-    r"^\s*(?:\*\*)?(?:answer|correct\s*answer|ans)\s*[:：]\s*(.+?)\s*(?:\*\*)?\s*$",
+    r"^\s*\*{0,2}\s*(?:answer|correct\s*answer|ans)\s*\*{0,2}\s*[:：]\s*(.+?)\s*\*{0,2}\s*$",
     re.IGNORECASE,
 )
 
