@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
-import argparse
+from typing import Any
 
 from quiz_markdown import parse_quiz_markdown
 
@@ -32,7 +33,12 @@ multiple_choice = [
     },
     {
         "title": "3. Class A airspace is typically used for:",
-        "options": ["VFR only", "IFR only", "Both IFR and VFR", "Military aircraft only"],
+        "options": [
+            "VFR only",
+            "IFR only",
+            "Both IFR and VFR",
+            "Military aircraft only",
+        ],
         "answer": "IFR only",
     },
     {
@@ -92,11 +98,20 @@ multiple_choice = [
     },
 ]
 
-true_false = [
-    {"title": "11. VFR flights require continuous visual reference to the ground.", "answer": "True"},
-    {"title": "12. All European countries operate under a single ANSP.", "answer": "False"},
+true_false: list[dict[str, str]] = [
+    {
+        "title": "11. VFR flights require continuous visual reference to the ground.",
+        "answer": "True",
+    },
+    {
+        "title": "12. All European countries operate under a single ANSP.",
+        "answer": "False",
+    },
     {"title": "13. Alerting service is part of ATS.", "answer": "True"},
-    {"title": "14. Airspace classes A–G are internationally standardized.", "answer": "True"},
+    {
+        "title": "14. Airspace classes A–G are internationally standardized.",
+        "answer": "True",
+    },
     {"title": "15. ATM includes both air and ground components.", "answer": "True"},
 ]
 
@@ -109,7 +124,7 @@ short_answers = [
 ]
 
 
-def authorize() -> any:
+def authorize() -> Any:
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
@@ -126,6 +141,7 @@ def authorize() -> any:
             flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
             creds = flow.run_local_server(port=0)
         token_path.write_text(creds.to_json())
+        token_path.chmod(0o600)
     return build("forms", "v1", credentials=creds)
 
 
@@ -141,24 +157,26 @@ def build_requests() -> list[dict]:
         }
     )
     idx += 1
-    for q in multiple_choice:
+    for mc_q in multiple_choice:
         requests.append(
             {
                 "createItem": {
                     "item": {
-                        "title": q["title"],
+                        "title": mc_q["title"],
                         "questionItem": {
                             "question": {
                                 "required": True,
                                 "grading": {
                                     "pointValue": 1,
                                     "correctAnswers": {
-                                        "answers": [{"value": q["answer"]}]
+                                        "answers": [{"value": mc_q["answer"]}]
                                     },
                                 },
                                 "choiceQuestion": {
                                     "type": "RADIO",
-                                    "options": [{"value": opt} for opt in q["options"]],
+                                    "options": [
+                                        {"value": opt} for opt in mc_q["options"]
+                                    ],
                                     "shuffle": False,
                                 },
                             }
@@ -179,19 +197,19 @@ def build_requests() -> list[dict]:
         }
     )
     idx += 1
-    for q in true_false:
+    for tf_q in true_false:
         requests.append(
             {
                 "createItem": {
                     "item": {
-                        "title": q["title"],
+                        "title": tf_q["title"],
                         "questionItem": {
                             "question": {
                                 "required": True,
                                 "grading": {
                                     "pointValue": 1,
                                     "correctAnswers": {
-                                        "answers": [{"value": q["answer"]}]
+                                        "answers": [{"value": tf_q["answer"]}]
                                     },
                                 },
                                 "choiceQuestion": {
@@ -344,9 +362,15 @@ def quiz_settings_request() -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="Create a Google Forms quiz.")
-    parser.add_argument("--dry-run", action="store_true", help="Print the Google Forms API payloads without creating a form")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the Google Forms API payloads without creating a form",
+    )
     parser.add_argument("--title", default=QUIZ_TITLE, help="Form title")
-    parser.add_argument("--input", type=Path, help="Path to a markdown quiz file to convert")
+    parser.add_argument(
+        "--input", type=Path, help="Path to a markdown quiz file to convert"
+    )
     args = parser.parse_args()
 
     create_body = {"info": {"title": args.title}}
@@ -359,14 +383,24 @@ def main():
     requests = [quiz_settings_request(), *requests]
 
     if args.dry_run:
-        print(json.dumps({"create": create_body, "batchUpdate": {"requests": requests}}, indent=2))
+        print(
+            json.dumps(
+                {"create": create_body, "batchUpdate": {"requests": requests}}, indent=2
+            )
+        )
         return
 
     service = authorize()
     form = service.forms().create(body=create_body).execute()
-    service.forms().batchUpdate(formId=form["formId"], body={"requests": requests}).execute()
+    service.forms().batchUpdate(
+        formId=form["formId"], body={"requests": requests}
+    ).execute()
     result = service.forms().get(formId=form["formId"]).execute()
-    print(json.dumps({"formId": form["formId"], "responderUri": result["responderUri"]}, indent=2))
+    print(
+        json.dumps(
+            {"formId": form["formId"], "responderUri": result["responderUri"]}, indent=2
+        )
+    )
 
 
 if __name__ == "__main__":

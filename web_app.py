@@ -7,6 +7,7 @@ from email import policy
 from email.parser import BytesParser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
 
 from generate_form import authorize, build_requests_from_sections, quiz_settings_request
 from quiz_markdown import parse_quiz_markdown
@@ -28,23 +29,29 @@ def _parse_content_type(value: str) -> tuple[str, dict[str, str]]:
     return ctype, params
 
 
-def _parse_multipart_form_data(content_type: str, body: bytes) -> tuple[dict[str, str], dict[str, dict]]:
+def _parse_multipart_form_data(
+    content_type: str, body: bytes
+) -> tuple[dict[str, str], dict[str, Any]]:
     # Parse multipart/form-data without the deprecated/removed `cgi` module.
     msg = BytesParser(policy=policy.default).parsebytes(
-        b"Content-Type: " + content_type.encode("utf-8") + b"\r\nMIME-Version: 1.0\r\n\r\n" + body
+        b"Content-Type: "
+        + content_type.encode("utf-8")
+        + b"\r\nMIME-Version: 1.0\r\n\r\n"
+        + body
     )
     if not msg.is_multipart():
         raise ValueError("Not a multipart request")
 
     fields: dict[str, str] = {}
-    files: dict[str, dict] = {}
+    files: dict[str, Any] = {}
 
     for part in msg.iter_parts():
         name = part.get_param("name", header="content-disposition")
-        if not name:
+        if not isinstance(name, str) or not name:
             continue
         filename = part.get_param("filename", header="content-disposition")
-        data = part.get_payload(decode=True) or b""
+        payload = part.get_payload(decode=True)
+        data: bytes = payload if isinstance(payload, bytes) else b""
         if filename:
             files[name] = {
                 "filename": filename,
@@ -123,12 +130,23 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             self.send_error(HTTPStatus.BAD_REQUEST, "Invalid Content-Length")
             return
+
+        if length <= 0:
+            self.send_error(HTTPStatus.BAD_REQUEST, "Invalid Content-Length")
+            return
+
+        max_upload_size = 10 * 1024 * 1024  # 10 MB
+        if length > max_upload_size:
+            self.send_error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "Upload too large")
+            return
+
         body = self.rfile.read(length)
 
         try:
             fields, files = _parse_multipart_form_data(content_type, body)
         except Exception as e:
-            self.send_error(HTTPStatus.BAD_REQUEST, f"Could not parse multipart body: {e}")
+            self.log_error("Could not parse multipart body: %s", e)
+            self.send_error(HTTPStatus.BAD_REQUEST, "Could not parse multipart body")
             return
 
         title = (fields.get("title") or "Quiz").strip() or "Quiz"
@@ -142,7 +160,8 @@ class Handler(BaseHTTPRequestHandler):
             raw = files["file"]["data"]
             markdown = raw.decode("utf-8")
         except Exception as e:
-            self.send_error(HTTPStatus.BAD_REQUEST, f"Could not read uploaded file: {e}")
+            self.log_error("Could not read uploaded file: %s", e)
+            self.send_error(HTTPStatus.BAD_REQUEST, "Could not read uploaded file")
             return
 
         try:
@@ -156,7 +175,9 @@ class Handler(BaseHTTPRequestHandler):
         requests = [quiz_settings_request(), *requests]
 
         if dry_run:
-            payload = json.dumps({"create": create_body, "batchUpdate": {"requests": requests}}, indent=2)
+            payload = json.dumps(
+                {"create": create_body, "batchUpdate": {"requests": requests}}, indent=2
+            )
             self._send_html(
                 HTTPStatus.OK,
                 _page(
@@ -174,7 +195,9 @@ class Handler(BaseHTTPRequestHandler):
         try:
             service = authorize()
             form_obj = service.forms().create(body=create_body).execute()
-            service.forms().batchUpdate(formId=form_obj["formId"], body={"requests": requests}).execute()
+            service.forms().batchUpdate(
+                formId=form_obj["formId"], body={"requests": requests}
+            ).execute()
             result = service.forms().get(formId=form_obj["formId"]).execute()
         except Exception as e:
             self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"Google API error: {e}")
@@ -208,7 +231,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Local web UI for creating a Google Form from markdown")
+    parser = argparse.ArgumentParser(
+        description="Local web UI for creating a Google Form from markdown"
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
