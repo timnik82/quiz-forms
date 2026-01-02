@@ -1,0 +1,140 @@
+﻿Part 1 – Multiple choice (10 Questions)
+1. What is the main purpose of Air Traffic Services (ATS)?
+A. Reduce flight prices
+B. Ensure safe, orderly flow of air traffic
+C. Train pilots
+D. Manage airline operations
+________________
+
+
+2. Which organization defines global aviation standards?
+A. ICAO
+B. EUROCONTROL
+C. EASA
+D. IATA
+________________
+
+
+3. Class A airspace is typically used for:
+A. VFR only
+B. IFR only
+C. Both IFR and VFR
+D. Military aircraft only
+________________
+
+
+4. Which unit provides en-route air traffic control?
+A. TWR
+B. APP
+C. ACC
+D. AIS
+________________
+
+
+5. A Flight Information Region (FIR) provides:
+A. ATC only
+B. FIS and alerting service
+C. Customs and immigration
+D. Slot coordination
+________________
+
+
+6. ATFM primarily aims to:
+A. Increase airline profits
+B. Balance demand and capacity
+C. Reduce controller workload
+D. Provide weather forecasts
+________________
+
+
+7. GAT refers to air traffic that:
+A. Follows ICAO rules
+B. Is military only
+C. Does not require ATC
+D. Flies only VFR
+________________
+
+
+8. The Flexible Use of Airspace (FUA) concept promotes:
+A. Exclusive use by military
+B. Shared civil-military operation
+C. Permanent airspace closure
+D. Drone-only flight corridors
+________________
+
+
+9. Which body acts as the Network Manager in Europe?
+A. ICAO
+B. IATA
+C. EUROCONTROL
+D. FAA
+________________
+
+
+10. Which service provides essential information for safe flight operations?
+A. ATC
+B. FIS
+C. MET
+D. AIS
+________________
+Part 2 – True / False (5 Questions)
+Write T or F.
+11. VFR flights require continuous visual reference to the ground.
+________________
+
+
+12. All European countries operate under a single ANSP.
+________________
+
+
+13. Alerting service is part of ATS.
+________________
+
+
+14. Airspace classes A–G are internationally standardized.
+________________
+
+
+15. ATM includes both air and ground components.
+________________
+
+
+Part 3 – Short Answer (5 Questions)
+Write 1–3 sentences per question (short exact answers are encouraged)
+16. What is the main difference between a CTR and a TMA?
+Answer:
+________________
+________________
+________________
+________________
+
+
+17. Why is Airspace Management divided into 3 levels (strategic, pre-tactical, tactical)?
+Answer:
+________________
+________________
+________________
+________________
+
+
+18. What is the purpose of a CTOT in ATFM?
+Answer:
+________________
+________________
+________________
+________________
+
+
+19. Describe two key performance areas (KPAs) used to evaluate ATM.
+Answer:
+________________
+________________
+________________
+________________
+
+
+20. What is the role of ICAO in relation to national regulations?
+Answer:
+________________
+________________
+________________

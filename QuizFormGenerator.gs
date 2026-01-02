@@ -16,7 +16,8 @@ function onOpen() {
   DocumentApp.getUi()
     .createMenu('Quiz Tools')
     .addItem('Create Quiz Form', 'createQuizFromDoc')
-    .addItem('Create Quiz Form (Preview Only)', 'previewQuiz')
+    .addItem('Preview Only', 'previewQuiz')
+    .addItem('Debug Raw Text', 'debugRawText')
     .addToUi();
 }
 
@@ -50,8 +51,8 @@ function previewQuiz() {
       preview += `Section ${i + 1}: ${section.title} (${section.kind || 'auto'})\n`;
       section.questions.forEach((q, j) => {
         preview += `  Q${j + 1}: ${q.title.substring(0, 50)}... [${q.type}]\n`;
-        if (q.options) {
-          preview += `    Options: ${q.options.length}\n`;
+        if (q.options && q.options.length > 0) {
+          preview += `    Options: ${q.options.join(', ')}\n`;
         }
         if (q.answer) {
           preview += `    Answer: ${q.answer}\n`;
@@ -66,9 +67,22 @@ function previewQuiz() {
   }
 }
 
+function debugRawText() {
+  const doc = DocumentApp.getActiveDocument();
+  const text = doc.getBody().getText();
+  const lines = text.replace(/^\uFEFF/, '').split('\n').slice(0, 10);
+  let debug = 'First 10 lines (raw):\n\n';
+  lines.forEach((line, i) => {
+    debug += `${i}: [${line.trim()}]\n`;
+  });
+  DocumentApp.getUi().alert('Debug', debug, DocumentApp.getUi().ButtonSet.OK);
+}
+
 // ============ PARSER ============
 
 function parseQuizText(text) {
+  // Strip BOM (Byte Order Mark) that Google Docs may add
+  text = text.replace(/^\uFEFF/, '');
   const lines = text.split('\n');
   const sections = [];
   let currentSection = null;
@@ -76,14 +90,20 @@ function parseQuizText(text) {
   let currentOptions = [];
   let currentAnswer = null;
   
+  // Markdown heading (for .md files)
   const HEADING_RE = /^#{1,6}\s+(.*)$/;
+  // Markdown bold line
   const BOLD_LINE_RE = /^\*\*(.+?)\*\*\s*$/;
   // Match options like "A." or "A)" with optional space after the delimiter (case-insensitive)
   const OPTION_RE = /^([A-Ha-h])[\.)]\s*(.*)$/i;
+  // Answer line
   const ANSWER_RE = /^\s*(?:\*\*)?(?:answer|correct\s*answer|ans)\s*[:：]\s*(.+?)\s*(?:\*\*)?\s*$/i;
+  // Question number at start
   const QUESTION_NUM_RE = /^\d+\s*[\.:)]\s*/;
-  // Detect section headers like "Part 1", "Part 2", "Section 1" etc.
+  // Detect section headers like "Part 1", "Part 2", "Section 1" etc. (works for both plain text and markdown)
   const SECTION_HEADER_RE = /^(part|section)\s+\d+/i;
+  // Google Docs horizontal rule (underscores)
+  const GDOC_HR_RE = /^[_]{3,}$/;
   
   function stripMarkdown(str) {
     return str.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\\\./g, '.').replace(/\s+/g, ' ').trim();
@@ -99,6 +119,26 @@ function parseQuizText(text) {
   
   function isSectionHeader(text) {
     return SECTION_HEADER_RE.test(text);
+  }
+
+  function extractInlineOptions(line) {
+    const re = /([A-Ha-h])[\.)]\s*/g;
+    const spans = [];
+    let m;
+    while ((m = re.exec(line)) !== null) {
+      spans.push({ start: m.index, end: m.index + m[0].length });
+    }
+    if (spans.length < 2) return null;
+
+    const options = [];
+    for (let i = 0; i < spans.length; i++) {
+      const start = spans[i].end;
+      const end = i + 1 < spans.length ? spans[i + 1].start : line.length;
+      const value = line.slice(start, end).trim();
+      if (value) options.push(stripMarkdown(value));
+    }
+
+    return options.length >= 2 ? options : null;
   }
   
   function flushQuestion() {
@@ -142,11 +182,12 @@ function parseQuizText(text) {
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const stripped = line.trim();
+    const stripped = line.trim().replace(/^[\uFEFF\u200B-\u200F]+/, '');
     
-    if (!stripped || stripped.match(/^-{3,}$/)) continue;
+    // Skip empty lines, markdown HRs (---), and Google Docs HRs (___)
+    if (!stripped || stripped.match(/^-{3,}$/) || GDOC_HR_RE.test(stripped)) continue;
     
-    // Check for heading (# or ## or ###)
+    // Check for markdown heading (# or ## or ###)
     const headingMatch = stripped.match(HEADING_RE);
     if (headingMatch) {
       const level = (stripped.match(/^#+/) || [''])[0].length;
@@ -167,11 +208,19 @@ function parseQuizText(text) {
       }
     }
     
-    // Check for bold section header (only if it looks like a section title, not a question)
+    // Check for plain text section header (e.g., "Part 1 – Multiple choice")
+    // This handles Google Docs plain text format
+    if (isSectionHeader(stripped)) {
+      flushQuestion();
+      currentSection = { title: stripped, kind: getSectionKind(stripped), questions: [] };
+      sections.push(currentSection);
+      continue;
+    }
+    
+    // Check for markdown bold section header
     const boldMatch = stripped.match(BOLD_LINE_RE);
     if (boldMatch) {
       const text = stripMarkdown(boldMatch[1]);
-      // Only treat as section header if it contains "Part" or "Section"
       if (isSectionHeader(text)) {
         flushQuestion();
         currentSection = { title: text, kind: getSectionKind(text), questions: [] };
@@ -180,11 +229,15 @@ function parseQuizText(text) {
       }
     }
     
-    // Check for question number at start of line
-    if (!currentQuestion && stripped.match(/^\d+\s*[\.:)]/)) {
-      flushQuestion();
-      currentQuestion = { title: stripMarkdown(stripped) };
-      continue;
+    // Check for question number at start of line (e.g., "1. What is...")
+    if (stripped.match(/^\d+\s*[\.:)]/)) {
+      // Don't start a new question if this looks like an option line that happens to start with a number
+      // Only treat as question if it doesn't match option pattern
+      if (!OPTION_RE.test(stripped)) {
+        flushQuestion();
+        currentQuestion = { title: stripMarkdown(stripped) };
+        continue;
+      }
     }
     
     if (!currentQuestion) continue;
@@ -196,9 +249,17 @@ function parseQuizText(text) {
       continue;
     }
     
-    // Check for option (A. B. C. etc) - stripped already removes leading whitespace
-    const optionMatch = stripped.match(OPTION_RE);
-    if (optionMatch) {
+    // Check for options (A. B. C. etc) - may be on a single line or separate lines.
+    // Don't require the option marker to be at the beginning of the line, since Google Docs
+    // can include invisible directionality chars or other prefixes.
+    const inlineOptions = extractInlineOptions(stripped);
+    if (inlineOptions) {
+      inlineOptions.forEach(opt => currentOptions.push(opt));
+      continue;
+    }
+
+    const optionMatch = stripped.match(/^[^A-Ha-h]*([A-Ha-h])[\.)]\s*(.*)$/i);
+    if (optionMatch && optionMatch[2].trim()) {
       currentOptions.push(stripMarkdown(optionMatch[2]));
       continue;
     }
