@@ -7,41 +7,176 @@
 #   2. General Comments (PR-level comments)
 #   3. Review Comments (line-specific code review comments)
 #
-# Required Environment Variables:
+# Authentication:
+#   Preferred: GitHub CLI (`gh`) if available and authenticated.
+#   Fallback: GitHub REST API using environment variables (optionally loaded from a local .env file).
+#
+# Optional env vars:
+#   USE_GH   - auto|always|never (default: auto)
+#   ENV_FILE - path to env file to load for fallback mode (default: .env)
+#
+# Fallback Environment Variables:
 #   GITHUB_TOKEN - GitHub Personal Access Token
 #   GITHUB_REPO - Repository in format "owner/repo" (e.g., "owner/repo-name")
 #   GITHUB_API_BASE - GitHub API base URL (default: https://api.github.com)
 #
 # Usage:
-#   ./fetch-pr-comments.sh <PR_NUMBER>       # Fetch all feedback for specific PR
-#   ./fetch-pr-comments.sh current           # Fetch all feedback for PR of current branch
-#   ./fetch-pr-comments.sh list              # List recent PRs
-#   ./fetch-pr-comments.sh search <text>     # Search PRs by branch name (client-side)
-#   ./fetch-pr-comments.sh api-search <text> # Search PRs using GitHub Search API (server-side)
+#   ./fetch-pr-feedback.sh <PR_NUMBER>       # Fetch all feedback for specific PR
+#   ./fetch-pr-feedback.sh current           # Fetch all feedback for PR of current branch
+#   ./fetch-pr-feedback.sh list              # List recent PRs
+#   ./fetch-pr-feedback.sh search <text>     # Search PRs by branch name (client-side)
+#   ./fetch-pr-feedback.sh api-search <text> # Search PRs using GitHub Search API (server-side)
+#
+# Examples:
+#   USE_GH=auto  ./fetch-pr-feedback.sh 5
+#   USE_GH=never ENV_FILE=.env ./fetch-pr-feedback.sh 5
 
 set -e -o pipefail
 
-# Validate environment variables
-if [ -z "$GITHUB_TOKEN" ]; then
-    echo "Error: GITHUB_TOKEN environment variable is required"
-    exit 1
-fi
+ENV_FILE="${ENV_FILE:-.env}"
+USE_GH="${USE_GH:-auto}"
 
-if [ -z "$GITHUB_REPO" ]; then
-    echo "Error: GITHUB_REPO environment variable is required"
-    exit 1
-fi
+# If repo isn't provided via env/.env, attempt to infer it from the git remote.
+infer_repo_from_git() {
+    local url
+    url=$(git config --get remote.origin.url 2>/dev/null || true)
+    [ -n "$url" ] || return 1
 
-if [ -z "$GITHUB_API_BASE" ]; then
-    GITHUB_API_BASE="https://api.github.com"
-fi
+    # Supports:
+    #   https://github.com/owner/repo(.git)
+    #   git@github.com:owner/repo(.git)
+    url=${url%.git}
 
-# Common headers for GitHub API v3
-HEADERS=(
-    -H "Accept: application/vnd.github+json"
-    -H "Authorization: Bearer $GITHUB_TOKEN"
-    -H "X-GitHub-Api-Version: 2022-11-28"
-)
+    if [[ "$url" =~ github\.com[:/]([^/]+/[^/]+)$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+        return 0
+    fi
+    return 1
+}
+
+has_gh() {
+    command -v gh >/dev/null 2>&1
+}
+
+gh_authed() {
+    gh auth status >/dev/null 2>&1
+}
+
+load_env_fallback() {
+    # Safe loader: only supports simple KEY=VALUE lines (no command execution).
+    local file="$1"
+    [ -f "$file" ] || return 0
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            ''|\#*) continue ;;
+        esac
+
+        # Support optional leading "export".
+        if [[ "$line" =~ ^[[:space:]]*export[[:space:]]+ ]]; then
+            line="${line#"${line%%[![:space:]]*}"}"  # strip leading whitespace
+            line="${line#export}"                     # strip "export"
+            line="${line#"${line%%[![:space:]]*}"}"  # strip whitespace after export
+        fi
+
+        # KEY=VALUE only.
+        if [[ ! "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+            continue
+        fi
+
+        local key="${BASH_REMATCH[1]}"
+        local val="${BASH_REMATCH[2]}"
+
+        # Strip surrounding quotes.
+        if [[ "$val" =~ ^"(.*)"$ ]]; then
+            val="${BASH_REMATCH[1]}"
+        elif [[ "$val" =~ ^'(.*)'$ ]]; then
+            val="${BASH_REMATCH[1]}"
+        fi
+
+        # Don’t override explicitly-set env vars (treat empty as explicitly set).
+        if [ "${!key+x}" != x ]; then
+            export "$key=$val"
+        fi
+    done < "$file"
+}
+
+use_gh_mode() {
+    if [ "$USE_GH" = "never" ]; then
+        return 1
+    fi
+
+    if has_gh && gh_authed; then
+        return 0
+    fi
+
+    if [ "$USE_GH" = "always" ]; then
+        echo "Error: USE_GH=always but gh is not available or not authenticated" >&2
+        exit 1
+    fi
+
+    return 1
+}
+
+init_auth() {
+    if use_gh_mode; then
+        # In gh mode, try to infer repo if not provided (needed for some paths).
+        if [ -z "$GITHUB_REPO" ]; then
+            GITHUB_REPO=$(infer_repo_from_git || true)
+            export GITHUB_REPO
+        fi
+        if [ -z "$GITHUB_REPO" ]; then
+            echo "Error: GITHUB_REPO is required (set it, or ensure remote.origin.url is a GitHub URL)" >&2
+            exit 1
+        fi
+        return 0
+    fi
+
+    # Fallback: load from .env if needed.
+    if [ -z "$GITHUB_TOKEN" ] || [ -z "$GITHUB_REPO" ]; then
+        load_env_fallback "$ENV_FILE"
+    fi
+
+    if [ -z "$GITHUB_REPO" ]; then
+        GITHUB_REPO=$(infer_repo_from_git || true)
+        export GITHUB_REPO
+    fi
+
+    if [ -z "$GITHUB_TOKEN" ]; then
+        echo "Error: GITHUB_TOKEN environment variable is required (or authenticate with 'gh auth login')" >&2
+        exit 1
+    fi
+    if [ -z "$GITHUB_REPO" ]; then
+        echo "Error: GITHUB_REPO environment variable is required" >&2
+        exit 1
+    fi
+
+    if [ -z "$GITHUB_API_BASE" ]; then
+        GITHUB_API_BASE="https://api.github.com"
+    fi
+
+    # Common headers for GitHub API v3
+    HEADERS=(
+        -H "Accept: application/vnd.github+json"
+        -H "Authorization: Bearer $GITHUB_TOKEN"
+        -H "X-GitHub-Api-Version: 2022-11-28"
+    )
+}
+
+api_get() {
+    local path="$1"
+    if use_gh_mode; then
+        if [[ "$path" == /repos/* ]] || [[ "$path" == /search/* ]]; then
+            gh api "$path"
+        else
+            gh api "/repos/$GITHUB_REPO$path"
+        fi
+    else
+        curl -s -L "${HEADERS[@]}" "$GITHUB_API_BASE$path"
+    fi
+}
+
+init_auth
 
 # Function to get PR number for current branch
 get_current_pr() {
@@ -61,8 +196,7 @@ get_current_pr() {
 
     # Search for the PR and get the most recently updated one
     local pr_data
-    pr_data=$(curl -s -L "${HEADERS[@]}" \
-        "$GITHUB_API_BASE/search/issues?q=$encoded_query&sort=updated&order=desc&per_page=1")
+    pr_data=$(api_get "/search/issues?q=$encoded_query&sort=updated&order=desc&per_page=1")
 
     # Safely parse the PR number from the JSON response
     local pr_number
@@ -87,8 +221,7 @@ except (json.JSONDecodeError, IndexError, KeyError):
 # Function to list recent PRs
 list_recent_prs() {
     echo "Fetching 20 most recent pull requests..."
-    curl -s -L "${HEADERS[@]}" \
-        "$GITHUB_API_BASE/repos/$GITHUB_REPO/pulls?state=all&per_page=20" \
+    api_get "/repos/$GITHUB_REPO/pulls?state=all&per_page=20" \
         | python3 -c "
 import json, sys
 try:
@@ -114,8 +247,7 @@ search_prs_client() {
     local search_term="$1"
     echo "Searching for PRs with branch containing: $search_term"
     echo "(Searching first 100 PRs - use 'api-search' for comprehensive search)"
-    curl -s -L "${HEADERS[@]}" \
-        "$GITHUB_API_BASE/repos/$GITHUB_REPO/pulls?state=all&per_page=100" \
+    api_get "/repos/$GITHUB_REPO/pulls?state=all&per_page=100" \
         | python3 -c "
 import json, sys
 
@@ -152,12 +284,12 @@ search_prs_api() {
     local search_term="$1"
     echo "Searching for PRs using GitHub Search API: $search_term"
 
-    # URL encode the search query
-    local query="repo:$GITHUB_REPO is:pr $search_term in:branch"
-    local encoded_query=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$query'))")
+    # URL encode the search query (filter by head branch name)
+    local query="repo:$GITHUB_REPO is:pr head:$search_term"
+    local encoded_query
+    encoded_query=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$query")
 
-    curl -s -L "${HEADERS[@]}" \
-        "$GITHUB_API_BASE/search/issues?q=$encoded_query&per_page=20" \
+    api_get "/search/issues?q=$encoded_query&per_page=20" \
         | python3 -c "
 import json, sys
 
@@ -197,8 +329,7 @@ fetch_pr_comments() {
     # Get PR details/metadata
     echo "PR Details:"
     echo "-----------"
-    curl -s -L "${HEADERS[@]}" \
-        "$GITHUB_API_BASE/repos/$GITHUB_REPO/pulls/$pr_number" \
+    api_get "/repos/$GITHUB_REPO/pulls/$pr_number" \
         | python3 -c "
 import json, sys
 try:
@@ -230,8 +361,7 @@ except Exception as e:
     echo ""
     echo "General Comments:"
     echo "----------------"
-    curl -s -L "${HEADERS[@]}" \
-        "$GITHUB_API_BASE/repos/$GITHUB_REPO/issues/$pr_number/comments" \
+    api_get "/repos/$GITHUB_REPO/issues/$pr_number/comments" \
         | python3 -c "
 import json, sys
 try:
@@ -258,8 +388,7 @@ except Exception as e:
     echo "--------------------------------------"
 
     # Get review comments (line-specific)
-    curl -s -L "${HEADERS[@]}" \
-        "$GITHUB_API_BASE/repos/$GITHUB_REPO/pulls/$pr_number/comments" \
+    api_get "/repos/$GITHUB_REPO/pulls/$pr_number/comments" \
         | python3 -c "
 import json, sys
 try:
@@ -311,6 +440,14 @@ case "${1:-}" in
     "")
         echo "Usage: $0 <command> [args]"
         echo ""
+        echo "Auth:"
+        echo "  - Preferred: GitHub CLI (gh) if installed + authenticated"
+        echo "  - Fallback: token-based GitHub REST API (GITHUB_TOKEN/GITHUB_REPO), optionally loaded from .env"
+        echo ""
+        echo "Optional env vars:"
+        echo "  USE_GH=auto|always|never   (default: auto)"
+        echo "  ENV_FILE=/path/to/.env     (default: .env)"
+        echo ""
         echo "Commands:"
         echo "  list                  - List 20 most recent pull requests"
         echo "  search <text>         - Search PRs by branch name (first 100 PRs only)"
@@ -326,6 +463,7 @@ case "${1:-}" in
         echo "  $0 api-search feature-branch"
         echo "  $0 current"
         echo "  $0 68"
+        echo "  USE_GH=never ENV_FILE=.env $0 68"
         echo ""
         echo "Note: 'api-search' is recommended for repositories with many PRs"
         exit 1
