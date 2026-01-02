@@ -263,6 +263,7 @@ function parseQuizText(text) {
 function buildForm(title, sections) {
   const form = FormApp.create(title);
   form.setIsQuiz(true);
+  applyResponseSettings_(form);
   
   for (const section of sections) {
     // Add section header as a page break (except for first section)
@@ -284,6 +285,58 @@ function buildForm(title, sections) {
   }
   
   return form;
+}
+
+function applyResponseSettings_(form) {
+  // Matches the “Responses” settings shown in the screenshot.
+  // Note: Response receipts (“send responders a copy…”) is not available via FormApp,
+  // so we best-effort set it via the Google Forms API; if that fails, form creation still succeeds.
+  form.setCollectEmail(true);
+
+  // Verified email collection requires sign-in; some accounts/orgs may restrict this setting.
+  if (typeof form.setRequireLogin === 'function') {
+    form.setRequireLogin(true);
+  }
+
+  form.setAllowResponseEdits(false);
+  form.setLimitOneResponsePerUser(false);
+
+  try {
+    setResponseReceiptsWhenRequested_(form.getId());
+  } catch (e) {
+    // Ignore; the form is still usable. (Common cause: Forms API not enabled for the Apps Script project.)
+  }
+}
+
+function setResponseReceiptsWhenRequested_(formId) {
+  const url = 'https://forms.googleapis.com/v1/forms/' + encodeURIComponent(formId) + ':batchUpdate';
+  const payload = {
+    requests: [
+      {
+        updateSettings: {
+          settings: {
+            responseReceipts: 'SEND_IF_REQUESTED'
+          },
+          updateMask: 'responseReceipts'
+        }
+      }
+    ]
+  };
+
+  const res = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    headers: {
+      Authorization: 'Bearer ' + ScriptApp.getOAuthToken()
+    },
+    muteHttpExceptions: true
+  });
+
+  const code = res.getResponseCode();
+  if (code < 200 || code >= 300) {
+    throw new Error('Forms API batchUpdate failed: HTTP ' + code + ' - ' + res.getContentText());
+  }
 }
 
 function addMultipleChoice(form, q) {
