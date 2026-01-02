@@ -120,6 +120,26 @@ function parseQuizText(text) {
   function isSectionHeader(text) {
     return SECTION_HEADER_RE.test(text);
   }
+
+  function extractInlineOptions(line) {
+    const re = /([A-Ha-h])[\.)]\s*/g;
+    const spans = [];
+    let m;
+    while ((m = re.exec(line)) !== null) {
+      spans.push({ start: m.index, end: m.index + m[0].length });
+    }
+    if (spans.length < 2) return null;
+
+    const options = [];
+    for (let i = 0; i < spans.length; i++) {
+      const start = spans[i].end;
+      const end = i + 1 < spans.length ? spans[i + 1].start : line.length;
+      const value = line.slice(start, end).trim();
+      if (value) options.push(stripMarkdown(value));
+    }
+
+    return options.length >= 2 ? options : null;
+  }
   
   function flushQuestion() {
     if (!currentQuestion) return;
@@ -162,7 +182,7 @@ function parseQuizText(text) {
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const stripped = line.trim();
+    const stripped = line.trim().replace(/^[\uFEFF\u200B-\u200F]+/, '');
     
     // Skip empty lines, markdown HRs (---), and Google Docs HRs (___)
     if (!stripped || stripped.match(/^-{3,}$/) || GDOC_HR_RE.test(stripped)) continue;
@@ -229,23 +249,18 @@ function parseQuizText(text) {
       continue;
     }
     
-    // Check for options (A. B. C. etc) - may be on single line or separate lines
-    const optionMatch = stripped.match(OPTION_RE);
-    if (optionMatch) {
-      // Check if multiple options are on the same line (e.g., "A. foo B. bar C. baz")
-      const inlineOptions = stripped.match(/([A-Ha-h])[\.)]\s*([^A-Ha-h]+?)(?=\s+[A-Ha-h][\.\)]|$)/gi);
-      if (inlineOptions && inlineOptions.length > 1) {
-        // Multiple options on same line
-        inlineOptions.forEach(opt => {
-          const m = opt.match(/^([A-Ha-h])[\.)]\s*(.*)$/i);
-          if (m && m[2].trim()) {
-            currentOptions.push(m[2].trim());
-          }
-        });
-      } else {
-        // Single option on this line
-        currentOptions.push(stripMarkdown(optionMatch[2]));
-      }
+    // Check for options (A. B. C. etc) - may be on a single line or separate lines.
+    // Don't require the option marker to be at the beginning of the line, since Google Docs
+    // can include invisible directionality chars or other prefixes.
+    const inlineOptions = extractInlineOptions(stripped);
+    if (inlineOptions) {
+      inlineOptions.forEach(opt => currentOptions.push(opt));
+      continue;
+    }
+
+    const optionMatch = stripped.match(/^[^A-Ha-h]*([A-Ha-h])[\.)]\s*(.*)$/i);
+    if (optionMatch && optionMatch[2].trim()) {
+      currentOptions.push(stripMarkdown(optionMatch[2]));
       continue;
     }
   }
