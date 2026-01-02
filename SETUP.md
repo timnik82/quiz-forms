@@ -26,7 +26,7 @@ Go to **Extensions** → **Apps Script**
 
 ## Document Format
 
-This script reads your **Google Doc text** (not a separate markdown file). You can write questions as plain text; formatting like headings/bold is optional.
+This script reads your **Google Doc text**. You can write questions as plain text; formatting like headings/bold is optional.
 
 Your Google Doc should follow a structure like this:
 
@@ -39,15 +39,11 @@ B. 4
 C. 5
 D. 6
 
-Answer: B
-
 ---
 
 Part 2 – True/False
 
 2. The sky is blue.
-
-Answer: True
 
 ---
 
