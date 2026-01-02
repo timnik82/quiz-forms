@@ -17,7 +17,6 @@ function onOpen() {
     .createMenu('Quiz Tools')
     .addItem('Create Quiz Form', 'createQuizFromDoc')
     .addItem('Preview Only', 'previewQuiz')
-    .addItem('Debug Raw Text', 'debugRawText')
     .addToUi();
 }
 
@@ -65,17 +64,6 @@ function previewQuiz() {
   } catch (e) {
     DocumentApp.getUi().alert('Error', 'Failed to parse: ' + e.message, DocumentApp.getUi().ButtonSet.OK);
   }
-}
-
-function debugRawText() {
-  const doc = DocumentApp.getActiveDocument();
-  const text = doc.getBody().getText();
-  const lines = text.replace(/^\uFEFF/, '').split('\n').slice(0, 10);
-  let debug = 'First 10 lines (raw):\n\n';
-  lines.forEach((line, i) => {
-    debug += `${i}: [${line.trim()}]\n`;
-  });
-  DocumentApp.getUi().alert('Debug', debug, DocumentApp.getUi().ButtonSet.OK);
 }
 
 // ============ PARSER ============
