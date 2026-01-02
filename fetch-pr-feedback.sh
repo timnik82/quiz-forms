@@ -47,7 +47,7 @@ infer_repo_from_git() {
     #   git@github.com:owner/repo(.git)
     url=${url%.git}
 
-    if [[ "$url" =~ github\.com[:/]+([^/]+/[^/]+)$ ]]; then
+    if [[ "$url" =~ github\.com[:/]([^/]+/[^/]+)$ ]]; then
         echo "${BASH_REMATCH[1]}"
         return 0
     fi
@@ -94,8 +94,8 @@ load_env_fallback() {
             val="${BASH_REMATCH[1]}"
         fi
 
-        # Don’t override explicitly-set env vars.
-        if [ -z "${!key}" ]; then
+        # Don’t override explicitly-set env vars (treat empty as explicitly set).
+        if [ "${!key+x}" != x ]; then
             export "$key=$val"
         fi
     done < "$file"
@@ -105,7 +105,17 @@ use_gh_mode() {
     if [ "$USE_GH" = "never" ]; then
         return 1
     fi
-    has_gh && gh_authed
+
+    if has_gh && gh_authed; then
+        return 0
+    fi
+
+    if [ "$USE_GH" = "always" ]; then
+        echo "Error: USE_GH=always but gh is not available or not authenticated" >&2
+        exit 1
+    fi
+
+    return 1
 }
 
 init_auth() {
@@ -274,8 +284,8 @@ search_prs_api() {
     local search_term="$1"
     echo "Searching for PRs using GitHub Search API: $search_term"
 
-    # URL encode the search query
-    local query="repo:$GITHUB_REPO is:pr $search_term in:branch"
+    # URL encode the search query (filter by head branch name)
+    local query="repo:$GITHUB_REPO is:pr head:$search_term"
     local encoded_query
     encoded_query=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$query")
 

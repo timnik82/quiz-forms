@@ -294,8 +294,12 @@ function applyResponseSettings_(form) {
   form.setCollectEmail(true);
 
   // Verified email collection requires sign-in; some accounts/orgs may restrict this setting.
-  if (typeof form.setRequireLogin === 'function') {
-    form.setRequireLogin(true);
+  try {
+    if (typeof form.setRequireLogin === 'function') {
+      form.setRequireLogin(true);
+    }
+  } catch (e) {
+    // Ignore; some accounts/orgs may disallow requiring sign-in.
   }
 
   form.setAllowResponseEdits(false);
@@ -305,6 +309,7 @@ function applyResponseSettings_(form) {
     setResponseReceiptsWhenRequested_(form.getId());
   } catch (e) {
     // Ignore; the form is still usable. (Common cause: Forms API not enabled for the Apps Script project.)
+    Logger.log('Failed to set response receipts (non-critical): ' + (e && e.message ? e.message : e));
   }
 }
 
@@ -315,7 +320,7 @@ function setResponseReceiptsWhenRequested_(formId) {
       {
         updateSettings: {
           settings: {
-            responseReceipts: 'SEND_IF_REQUESTED'
+            responseReceipts: 'WHEN_REQUESTED'
           },
           updateMask: 'responseReceipts'
         }
