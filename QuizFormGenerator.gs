@@ -16,7 +16,8 @@ function onOpen() {
   DocumentApp.getUi()
     .createMenu('Quiz Tools')
     .addItem('Create Quiz Form', 'createQuizFromDoc')
-    .addItem('Create Quiz Form (Preview Only)', 'previewQuiz')
+    .addItem('Preview Only', 'previewQuiz')
+    .addItem('Debug Raw Text', 'debugRawText')
     .addToUi();
 }
 
@@ -50,8 +51,8 @@ function previewQuiz() {
       preview += `Section ${i + 1}: ${section.title} (${section.kind || 'auto'})\n`;
       section.questions.forEach((q, j) => {
         preview += `  Q${j + 1}: ${q.title.substring(0, 50)}... [${q.type}]\n`;
-        if (q.options) {
-          preview += `    Options: ${q.options.length}\n`;
+        if (q.options && q.options.length > 0) {
+          preview += `    Options: ${q.options.join(', ')}\n`;
         }
         if (q.answer) {
           preview += `    Answer: ${q.answer}\n`;
@@ -64,6 +65,17 @@ function previewQuiz() {
   } catch (e) {
     DocumentApp.getUi().alert('Error', 'Failed to parse: ' + e.message, DocumentApp.getUi().ButtonSet.OK);
   }
+}
+
+function debugRawText() {
+  const doc = DocumentApp.getActiveDocument();
+  const text = doc.getBody().getText();
+  const lines = text.replace(/^\uFEFF/, '').split('\n').slice(0, 10);
+  let debug = 'First 10 lines (raw):\n\n';
+  lines.forEach((line, i) => {
+    debug += `${i}: [${line.trim()}]\n`;
+  });
+  DocumentApp.getUi().alert('Debug', debug, DocumentApp.getUi().ButtonSet.OK);
 }
 
 // ============ PARSER ============
