@@ -229,10 +229,23 @@ function parseQuizText(text) {
       continue;
     }
     
-    // Check for option (A. B. C. etc)
+    // Check for options (A. B. C. etc) - may be on single line or separate lines
     const optionMatch = stripped.match(OPTION_RE);
     if (optionMatch) {
-      currentOptions.push(stripMarkdown(optionMatch[2]));
+      // Check if multiple options are on the same line (e.g., "A. foo B. bar C. baz")
+      const inlineOptions = stripped.match(/([A-Ha-h])[\.)]\s*([^A-Ha-h]+?)(?=\s+[A-Ha-h][\.\)]|$)/gi);
+      if (inlineOptions && inlineOptions.length > 1) {
+        // Multiple options on same line
+        inlineOptions.forEach(opt => {
+          const m = opt.match(/^([A-Ha-h])[\.)]\s*(.*)$/i);
+          if (m && m[2].trim()) {
+            currentOptions.push(m[2].trim());
+          }
+        });
+      } else {
+        // Single option on this line
+        currentOptions.push(stripMarkdown(optionMatch[2]));
+      }
       continue;
     }
   }
