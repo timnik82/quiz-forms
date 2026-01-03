@@ -68,6 +68,51 @@ function previewQuiz() {
 
 // ============ PARSER ============
 
+/**
+ * Extract question number from a line like "1. What is..." or "15. True"
+ */
+function extractQuestionNumber(line) {
+  const match = line.match(/^(\d+)\s*[\.:)]/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+/**
+ * Parse the answer key section and return a map of question number to answer value
+ */
+function parseAnswerKey(lines, startIndex) {
+  const answers = {};
+  // Pattern: "1. B – explanation" or "11. True" or "16. CTR vs TMA: explanation"
+  const ANSWER_LINE_RE = /^(\d+)\s*[\.:)]\s*(.+)$/;
+  
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || line.match(/^[_-]{3,}$/)) continue;
+    
+    const match = line.match(ANSWER_LINE_RE);
+    if (match) {
+      const qNum = parseInt(match[1], 10);
+      let answerText = match[2].trim();
+      
+      // Extract just the letter if format is "B – explanation" or "B - explanation"
+      const letterMatch = answerText.match(/^([A-Ha-h])\s*[–\-—]\s*/i);
+      if (letterMatch) {
+        answers[qNum] = letterMatch[1].toUpperCase();
+      } else {
+        // For True/False or short answer, use the full text
+        // But clean up any trailing explanation in parentheses for T/F
+        const tfMatch = answerText.match(/^(true|false)\b/i);
+        if (tfMatch) {
+          answers[qNum] = tfMatch[1].charAt(0).toUpperCase() + tfMatch[1].slice(1).toLowerCase();
+        } else {
+          answers[qNum] = answerText;
+        }
+      }
+    }
+  }
+  
+  return answers;
+}
+
 function parseQuizText(text) {
   // Strip BOM (Byte Order Mark) that Google Docs may add
   text = text.replace(/^\uFEFF/, '');
@@ -77,6 +122,22 @@ function parseQuizText(text) {
   let currentQuestion = null;
   let currentOptions = [];
   let currentAnswer = null;
+  let currentQuestionNumber = null;
+  
+  // Answer key header detection
+  const ANSWER_KEY_HEADER_RE = /^(?:answer\s*key|answers?)\s*$/i;
+  
+  // First pass: find answer key section and parse it
+  let answerKeyStartIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const stripped = lines[i].trim();
+    if (ANSWER_KEY_HEADER_RE.test(stripped)) {
+      answerKeyStartIndex = i + 1;
+      break;
+    }
+  }
+  
+  const answerKeyMap = answerKeyStartIndex >= 0 ? parseAnswerKey(lines, answerKeyStartIndex) : {};
   
   // Markdown heading (for .md files)
   const HEADING_RE = /^#{1,6}\s+(.*)$/;
@@ -158,17 +219,24 @@ function parseQuizText(text) {
     if (qtype === 'true_false') {
       q.options = ['True', 'False'];
     }
+    // Apply answer from inline or from answer key map
     if (currentAnswer) {
       q.answer = currentAnswer;
+    } else if (currentQuestionNumber && answerKeyMap[currentQuestionNumber]) {
+      q.answer = answerKeyMap[currentQuestionNumber];
     }
     
     currentSection.questions.push(q);
     currentQuestion = null;
     currentOptions = [];
     currentAnswer = null;
+    currentQuestionNumber = null;
   }
   
-  for (let i = 0; i < lines.length; i++) {
+  // Stop parsing at answer key section if found
+  const parseEndIndex = answerKeyStartIndex >= 0 ? answerKeyStartIndex - 1 : lines.length;
+  
+  for (let i = 0; i < parseEndIndex; i++) {
     const line = lines[i];
     const stripped = line.trim().replace(/^[\uFEFF\u200B-\u200F]+/, '');
     
@@ -192,6 +260,7 @@ function parseQuizText(text) {
       if (text.match(/^\d+/) || QUESTION_NUM_RE.test(text)) {
         flushQuestion();
         currentQuestion = { title: text };
+        currentQuestionNumber = extractQuestionNumber(text);
         continue;
       }
     }
@@ -224,6 +293,7 @@ function parseQuizText(text) {
       if (!OPTION_RE.test(stripped)) {
         flushQuestion();
         currentQuestion = { title: stripMarkdown(stripped) };
+        currentQuestionNumber = extractQuestionNumber(stripped);
         continue;
       }
     }
