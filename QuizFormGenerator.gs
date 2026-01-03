@@ -160,6 +160,9 @@ function parseAnswerKey(lines, startIndex) {
 }
 
 function parseAnswerValue(answerText) {
+  // Strip common prefixes like "Correct Answer:", "Answer:", "Ans:"
+  answerText = answerText.replace(/^(?:answer|correct\s*answer|ans)\s*[:：]\s*/i, '').trim();
+  
   // Extract just the letter if format is "B – explanation" or "B - explanation"
   const letterMatch = answerText.match(/^([A-Ha-h])\s*[-–—]\s*/i);
   if (letterMatch) {
