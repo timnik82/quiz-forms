@@ -43,8 +43,18 @@ function previewQuiz() {
   const text = doc.getBody().getText();
   
   try {
-    const sections = parseQuizText(text);
+    const result = parseQuizTextWithDebug(text);
+    const sections = result.sections;
     let preview = 'Parsed Quiz Structure:\n\n';
+    
+    // Debug info
+    preview += '=== DEBUG INFO ===\n';
+    preview += `Answer Key Found: ${result.debug.answerKeyFound ? 'YES at line ' + result.debug.answerKeyLine : 'NO'}\n`;
+    preview += `Answers Parsed: ${Object.keys(result.debug.answerKeyMap).length}\n`;
+    if (Object.keys(result.debug.answerKeyMap).length > 0) {
+      preview += `Answer Map: ${JSON.stringify(result.debug.answerKeyMap)}\n`;
+    }
+    preview += '==================\n\n';
     
     sections.forEach((section, i) => {
       preview += `Section ${i + 1}: ${section.title} (${section.kind || 'auto'})\n`;
@@ -127,6 +137,10 @@ function parseAnswerKey(lines, startIndex) {
 }
 
 function parseQuizText(text) {
+  return parseQuizTextWithDebug(text).sections;
+}
+
+function parseQuizTextWithDebug(text) {
   // Strip BOM (Byte Order Mark) that Google Docs may add
   text = text.replace(/^\uFEFF/, '');
   const lines = text.split('\n');
@@ -151,6 +165,13 @@ function parseQuizText(text) {
   }
   
   const answerKeyMap = answerKeyStartIndex >= 0 ? parseAnswerKey(lines, answerKeyStartIndex) : {};
+  
+  // Debug info to return
+  const debug = {
+    answerKeyFound: answerKeyStartIndex >= 0,
+    answerKeyLine: answerKeyStartIndex,
+    answerKeyMap: answerKeyMap
+  };
   
   // Markdown heading (for .md files)
   const HEADING_RE = /^#{1,6}\s+(.*)$/;
@@ -338,7 +359,10 @@ function parseQuizText(text) {
   
   flushQuestion();
   
-  return sections.filter(s => s.questions.length > 0);
+  return {
+    sections: sections.filter(s => s.questions.length > 0),
+    debug: debug
+  };
 }
 
 // ============ FORM BUILDER ============
