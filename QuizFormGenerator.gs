@@ -50,9 +50,17 @@ function previewQuiz() {
     // Debug info
     preview += '=== DEBUG INFO ===\n';
     preview += `Answer Key Found: ${result.debug.answerKeyFound ? 'YES at line ' + result.debug.answerKeyLine : 'NO'}\n`;
-    preview += `Answers Parsed: ${Object.keys(result.debug.answerKeyMap).length}\n`;
-    if (Object.keys(result.debug.answerKeyMap).length > 0) {
-      preview += `Answer Map: ${JSON.stringify(result.debug.answerKeyMap)}\n`;
+    const answerCount = Object.keys(result.debug.answerKeyMap).filter(k => !k.startsWith('_')).length;
+    preview += `Answers Parsed: ${answerCount}\n`;
+    if (result.debug.answerKeyMap._debug_lines) {
+      preview += `First lines after header:\n${result.debug.answerKeyMap._debug_lines.join('\n')}\n`;
+    }
+    if (answerCount > 0) {
+      const cleanMap = {};
+      for (const k in result.debug.answerKeyMap) {
+        if (!k.startsWith('_')) cleanMap[k] = result.debug.answerKeyMap[k];
+      }
+      preview += `Answer Map: ${JSON.stringify(cleanMap)}\n`;
     }
     preview += '==================\n\n';
     
@@ -93,47 +101,86 @@ function parseAnswerKey(lines, startIndex) {
   const answers = {};
   // Pattern: "1. B – explanation" or "11. True" or "16. CTR vs TMA: explanation"
   const ANSWER_LINE_RE = /^(\d+)\s*[\.:)]\s*(.+)$/;
+  // Pattern for section headers like "Multiple-Choice Answers (1–10)" or "True/False Answers (11–15)"
+  const RANGE_HEADER_RE = /\((\d+)[–\-—](\d+)\)/;
   // Detect new section headers to stop parsing (e.g., "Part 1", "Quiz 2", "## Section")
   const SECTION_STOP_RE = /^(?:#{1,6}\s+)?(?:part|section|quiz)\s+\d+/i;
+  
+  // Track current question number for unnumbered answer lines (Google Docs strips numbers)
+  let currentQNum = null;
+  let endQNum = null;
+  
+  // Debug: store first few lines for inspection
+  answers._debug_lines = [];
   
   for (let i = startIndex; i < lines.length; i++) {
     // Strip BOM and invisible directionality chars (same as main parser)
     const line = lines[i].trim().replace(/^[\uFEFF\u200B-\u200F]+/, '');
+    if (i < startIndex + 15) {
+      answers._debug_lines.push(`L${i}: "${line.substring(0, 40)}"`);
+    }
     if (!line || line.match(/^[_-]{3,}$/)) continue;
     
     // Stop if we hit a new section header (prevents parsing next quiz as answers)
-    if (SECTION_STOP_RE.test(line)) break;
+    if (SECTION_STOP_RE.test(line)) {
+      answers._debug_lines.push('STOPPED: section header');
+      break;
+    }
     
-    const match = line.match(ANSWER_LINE_RE);
-    if (match) {
-      const qNum = parseInt(match[1], 10);
-      let answerText = match[2].trim();
-      
-      // Extract just the letter if format is "B – explanation" or "B - explanation"
-      const letterMatch = answerText.match(/^([A-Ha-h])\s*[-–—]\s*/i);
-      if (letterMatch) {
-        answers[qNum] = letterMatch[1].toUpperCase();
-      } else {
-        // For True/False or short answer, use the full text
-        // Handle T/F as single letter or full word (e.g., "T – explanation", "True", "False")
-        const tfMatch = answerText.match(/^(true|false|t|f)\b/i);
-        if (tfMatch) {
-          const raw = tfMatch[1].toLowerCase();
-          answers[qNum] = (raw === 't' || raw === 'true') ? 'True' : 'False';
-        } else {
-          // Handle single letter answers like "B" or "B." (without dash)
-          const singleLetterMatch = answerText.match(/^([A-Ha-h])\.?$/i);
-          if (singleLetterMatch) {
-            answers[qNum] = singleLetterMatch[1].toUpperCase();
-          } else {
-            answers[qNum] = answerText;
-          }
-        }
+    // Check for range header like "Multiple-Choice Answers (1–10)"
+    const rangeMatch = line.match(RANGE_HEADER_RE);
+    if (rangeMatch) {
+      currentQNum = parseInt(rangeMatch[1], 10);
+      endQNum = parseInt(rangeMatch[2], 10);
+      answers._debug_lines.push(`RANGE: ${currentQNum}-${endQNum}`);
+      continue;
+    }
+    
+    // Try to match numbered line first: "1. B – explanation"
+    const numberedMatch = line.match(ANSWER_LINE_RE);
+    if (numberedMatch) {
+      const qNum = parseInt(numberedMatch[1], 10);
+      const answerText = numberedMatch[2].trim();
+      answers[qNum] = parseAnswerValue(answerText);
+      continue;
+    }
+    
+    // Handle unnumbered answer lines (Google Docs numbered lists)
+    if (currentQNum !== null && currentQNum <= endQNum) {
+      const answerText = line;
+      const parsed = parseAnswerValue(answerText);
+      if (parsed) {
+        answers[currentQNum] = parsed;
+        currentQNum++;
       }
     }
   }
   
   return answers;
+}
+
+function parseAnswerValue(answerText) {
+  // Extract just the letter if format is "B – explanation" or "B - explanation"
+  const letterMatch = answerText.match(/^([A-Ha-h])\s*[-–—]\s*/i);
+  if (letterMatch) {
+    return letterMatch[1].toUpperCase();
+  }
+  
+  // Handle T/F as single letter or full word (e.g., "T – explanation", "True", "False")
+  const tfMatch = answerText.match(/^(true|false|t|f)\b/i);
+  if (tfMatch) {
+    const raw = tfMatch[1].toLowerCase();
+    return (raw === 't' || raw === 'true') ? 'True' : 'False';
+  }
+  
+  // Handle single letter answers like "B" or "B." (without dash)
+  const singleLetterMatch = answerText.match(/^([A-Ha-h])\.?$/i);
+  if (singleLetterMatch) {
+    return singleLetterMatch[1].toUpperCase();
+  }
+  
+  // Return full text for short answers
+  return answerText;
 }
 
 function parseQuizText(text) {
