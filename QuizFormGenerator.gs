@@ -106,10 +106,13 @@ function parseAnswerKey(lines, startIndex) {
   const answers = {};
   // Pattern: "1. B – explanation" or "11. True" or "16. CTR vs TMA: explanation"
   const ANSWER_LINE_RE = /^(\d+)\s*[\.:)]\s*(.+)$/;
-  // Pattern for section headers like "Multiple-Choice Answers (1–10)" or "True/False Answers (11–15)"
-  const RANGE_HEADER_RE = /\((\d+)[–\-—](\d+)\)/;
+  // Pattern for section headers like "Multiple-Choice Answers (1–10)" - must end with the range
+  // This prevents matching answer explanations that contain parenthetical ranges
+  const RANGE_HEADER_RE = /(?:answers?|questions?)\s*\((\d+)[–\-—](\d+)\)\s*$/i;
   // Detect new section headers to stop parsing (e.g., "Part 1", "Quiz 2", "## Section")
   const SECTION_STOP_RE = /^(?:#{1,6}\s+)?(?:part|section|quiz)\s+\d+/i;
+  // Detect another answer key header to stop parsing
+  const ANSWER_KEY_HEADER_RE = /^#{0,6}\s*(?:\*\*)?(?:answer\s*key|answers?)(?:\*\*)?\s*$/i;
   
   // Track current question number for unnumbered answer lines (Google Docs strips numbers)
   let currentQNum = null;
@@ -132,7 +135,14 @@ function parseAnswerKey(lines, startIndex) {
       break;
     }
     
+    // Stop if we hit another answer key header (prevents overwriting from second answer key)
+    if (ANSWER_KEY_HEADER_RE.test(line)) {
+      answers._debug_lines.push('STOPPED: another answer key header');
+      break;
+    }
+    
     // Check for range header like "Multiple-Choice Answers (1–10)"
+    // Only match if line contains "answers" or "questions" followed by the range at end
     const rangeMatch = line.match(RANGE_HEADER_RE);
     if (rangeMatch) {
       currentQNum = parseInt(rangeMatch[1], 10);
