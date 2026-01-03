@@ -83,11 +83,16 @@ function parseAnswerKey(lines, startIndex) {
   const answers = {};
   // Pattern: "1. B – explanation" or "11. True" or "16. CTR vs TMA: explanation"
   const ANSWER_LINE_RE = /^(\d+)\s*[\.:)]\s*(.+)$/;
+  // Detect new section headers to stop parsing (e.g., "Part 1", "Quiz 2", "## Section")
+  const SECTION_STOP_RE = /^(?:#{1,6}\s+)?(?:part|section|quiz)\s+\d+/i;
   
   for (let i = startIndex; i < lines.length; i++) {
     // Strip BOM and invisible directionality chars (same as main parser)
     const line = lines[i].trim().replace(/^[\uFEFF\u200B-\u200F]+/, '');
     if (!line || line.match(/^[_-]{3,}$/)) continue;
+    
+    // Stop if we hit a new section header (prevents parsing next quiz as answers)
+    if (SECTION_STOP_RE.test(line)) break;
     
     const match = line.match(ANSWER_LINE_RE);
     if (match) {
@@ -95,7 +100,7 @@ function parseAnswerKey(lines, startIndex) {
       let answerText = match[2].trim();
       
       // Extract just the letter if format is "B – explanation" or "B - explanation"
-      const letterMatch = answerText.match(/^([A-Ha-h])\s*[–\-—]\s*/i);
+      const letterMatch = answerText.match(/^([A-Ha-h])\s*[-–—]\s*/i);
       if (letterMatch) {
         answers[qNum] = letterMatch[1].toUpperCase();
       } else {
@@ -106,7 +111,13 @@ function parseAnswerKey(lines, startIndex) {
           const raw = tfMatch[1].toLowerCase();
           answers[qNum] = (raw === 't' || raw === 'true') ? 'True' : 'False';
         } else {
-          answers[qNum] = answerText;
+          // Handle single letter answers like "B" or "B." (without dash)
+          const singleLetterMatch = answerText.match(/^([A-Ha-h])\.?$/i);
+          if (singleLetterMatch) {
+            answers[qNum] = singleLetterMatch[1].toUpperCase();
+          } else {
+            answers[qNum] = answerText;
+          }
         }
       }
     }
