@@ -43,8 +43,31 @@ function previewQuiz() {
   const text = doc.getBody().getText();
   
   try {
-    const sections = parseQuizText(text);
+    const result = parseQuizTextWithDebug(text);
+    const sections = result.sections;
     let preview = 'Parsed Quiz Structure:\n\n';
+    
+    // Debug info
+    preview += '=== DEBUG INFO ===\n';
+    if (result.debug.multipleAnswerKeysWarning) {
+      preview += '⚠️ WARNING: Multiple answer key sections detected!\n';
+      preview += 'Only the first answer key will be used.\n';
+      preview += 'Split into separate documents for multiple quizzes.\n\n';
+    }
+    preview += `Answer Key Found: ${result.debug.answerKeyFound ? 'YES at line ' + result.debug.answerKeyLine : 'NO'}\n`;
+    const answerCount = Object.keys(result.debug.answerKeyMap).filter(k => !k.startsWith('_')).length;
+    preview += `Answers Parsed: ${answerCount}\n`;
+    if (result.debug.answerKeyMap._debug_lines) {
+      preview += `First lines after header:\n${result.debug.answerKeyMap._debug_lines.join('\n')}\n`;
+    }
+    if (answerCount > 0) {
+      const cleanMap = {};
+      for (const k in result.debug.answerKeyMap) {
+        if (!k.startsWith('_')) cleanMap[k] = result.debug.answerKeyMap[k];
+      }
+      preview += `Answer Map: ${JSON.stringify(cleanMap)}\n`;
+    }
+    preview += '==================\n\n';
     
     sections.forEach((section, i) => {
       preview += `Section ${i + 1}: ${section.title} (${section.kind || 'auto'})\n`;
@@ -68,7 +91,121 @@ function previewQuiz() {
 
 // ============ PARSER ============
 
+/**
+ * Extract question number from a line like "1. What is..." or "15. True"
+ */
+function extractQuestionNumber(line) {
+  const match = line.match(/^(\d+)\s*[\.:)]/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+/**
+ * Parse the answer key section and return a map of question number to answer value
+ */
+function parseAnswerKey(lines, startIndex) {
+  const answers = {};
+  // Pattern: "1. B – explanation" or "11. True" or "16. CTR vs TMA: explanation"
+  const ANSWER_LINE_RE = /^(\d+)\s*[\.:)]\s*(.+)$/;
+  // Pattern for section headers like "Multiple-Choice Answers (1–10)" - must end with the range
+  // This prevents matching answer explanations that contain parenthetical ranges
+  const RANGE_HEADER_RE = /(?:answers?|questions?)\s*\((\d+)[–\-—](\d+)\)\s*$/i;
+  // Detect new section headers to stop parsing (e.g., "Part 1", "Quiz 2", "## Section")
+  const SECTION_STOP_RE = /^(?:#{1,6}\s+)?(?:part|section|quiz)\s+\d+/i;
+  // Detect another answer key header to stop parsing
+  const ANSWER_KEY_HEADER_RE = /^#{0,6}\s*(?:\*\*)?(?:answer\s*key|answers?)(?:\*\*)?\s*$/i;
+  
+  // Track current question number for unnumbered answer lines (Google Docs strips numbers)
+  let currentQNum = null;
+  let endQNum = null;
+  
+  // Debug: store first few lines for inspection
+  answers._debug_lines = [];
+  
+  for (let i = startIndex; i < lines.length; i++) {
+    // Strip BOM and invisible directionality chars (same as main parser)
+    const line = lines[i].trim().replace(/^[\uFEFF\u200B-\u200F]+/, '');
+    if (i < startIndex + 15) {
+      answers._debug_lines.push(`L${i}: "${line.substring(0, 40)}"`);
+    }
+    if (!line || line.match(/^[_-]{3,}$/)) continue;
+    
+    // Stop if we hit a new section header (prevents parsing next quiz as answers)
+    if (SECTION_STOP_RE.test(line)) {
+      answers._debug_lines.push('STOPPED: section header');
+      break;
+    }
+    
+    // Stop if we hit another answer key header (prevents overwriting from second answer key)
+    if (ANSWER_KEY_HEADER_RE.test(line)) {
+      answers._debug_lines.push('STOPPED: another answer key header');
+      break;
+    }
+    
+    // Check for range header like "Multiple-Choice Answers (1–10)"
+    // Only match if line contains "answers" or "questions" followed by the range at end
+    const rangeMatch = line.match(RANGE_HEADER_RE);
+    if (rangeMatch) {
+      currentQNum = parseInt(rangeMatch[1], 10);
+      endQNum = parseInt(rangeMatch[2], 10);
+      answers._debug_lines.push(`RANGE: ${currentQNum}-${endQNum}`);
+      continue;
+    }
+    
+    // Try to match numbered line first: "1. B – explanation"
+    const numberedMatch = line.match(ANSWER_LINE_RE);
+    if (numberedMatch) {
+      const qNum = parseInt(numberedMatch[1], 10);
+      const answerText = numberedMatch[2].trim();
+      answers[qNum] = parseAnswerValue(answerText);
+      continue;
+    }
+    
+    // Handle unnumbered answer lines (Google Docs numbered lists)
+    if (currentQNum !== null && currentQNum <= endQNum) {
+      const answerText = line;
+      const parsed = parseAnswerValue(answerText);
+      if (parsed) {
+        answers[currentQNum] = parsed;
+        currentQNum++;
+      }
+    }
+  }
+  
+  return answers;
+}
+
+function parseAnswerValue(answerText) {
+  // Strip common prefixes like "Correct Answer:", "Answer:", "Ans:"
+  answerText = answerText.replace(/^(?:answer|correct\s*answer|ans)\s*[:：]\s*/i, '').trim();
+  
+  // Extract just the letter if format is "B – explanation" or "B - explanation"
+  const letterMatch = answerText.match(/^([A-Ha-h])\s*[-–—]\s*/i);
+  if (letterMatch) {
+    return letterMatch[1].toUpperCase();
+  }
+  
+  // Handle T/F as single letter or full word (e.g., "T – explanation", "True", "False")
+  const tfMatch = answerText.match(/^(true|false|t|f)\b/i);
+  if (tfMatch) {
+    const raw = tfMatch[1].toLowerCase();
+    return (raw === 't' || raw === 'true') ? 'True' : 'False';
+  }
+  
+  // Handle single letter answers like "B" or "B." (without dash)
+  const singleLetterMatch = answerText.match(/^([A-Ha-h])\.?$/i);
+  if (singleLetterMatch) {
+    return singleLetterMatch[1].toUpperCase();
+  }
+  
+  // Return full text for short answers
+  return answerText;
+}
+
 function parseQuizText(text) {
+  return parseQuizTextWithDebug(text).sections;
+}
+
+function parseQuizTextWithDebug(text) {
   // Strip BOM (Byte Order Mark) that Google Docs may add
   text = text.replace(/^\uFEFF/, '');
   const lines = text.split('\n');
@@ -77,6 +214,36 @@ function parseQuizText(text) {
   let currentQuestion = null;
   let currentOptions = [];
   let currentAnswer = null;
+  let currentQuestionNumber = null;
+  
+  // Answer key header detection (supports plain text and Markdown headings like "## Answer Key")
+  const ANSWER_KEY_HEADER_RE = /^#{0,6}\s*(?:\*\*)?(?:answer\s*key|answers?)(?:\*\*)?\s*$/i;
+  
+  // First pass: find answer key section(s) and parse the first one
+  let answerKeyStartIndex = -1;
+  let multipleAnswerKeysFound = false;
+  for (let i = 0; i < lines.length; i++) {
+    const stripped = lines[i].trim();
+    if (ANSWER_KEY_HEADER_RE.test(stripped)) {
+      if (answerKeyStartIndex === -1) {
+        answerKeyStartIndex = i + 1;
+      } else {
+        // Found a second answer key section
+        multipleAnswerKeysFound = true;
+        break;
+      }
+    }
+  }
+  
+  const answerKeyMap = answerKeyStartIndex >= 0 ? parseAnswerKey(lines, answerKeyStartIndex) : {};
+  
+  // Debug info to return
+  const debug = {
+    answerKeyFound: answerKeyStartIndex >= 0,
+    answerKeyLine: answerKeyStartIndex,
+    answerKeyMap: answerKeyMap,
+    multipleAnswerKeysWarning: multipleAnswerKeysFound
+  };
   
   // Markdown heading (for .md files)
   const HEADING_RE = /^#{1,6}\s+(.*)$/;
@@ -158,17 +325,24 @@ function parseQuizText(text) {
     if (qtype === 'true_false') {
       q.options = ['True', 'False'];
     }
+    // Apply answer from inline or from answer key map
     if (currentAnswer) {
       q.answer = currentAnswer;
+    } else if (currentQuestionNumber && answerKeyMap[currentQuestionNumber]) {
+      q.answer = answerKeyMap[currentQuestionNumber];
     }
     
     currentSection.questions.push(q);
     currentQuestion = null;
     currentOptions = [];
     currentAnswer = null;
+    currentQuestionNumber = null;
   }
   
-  for (let i = 0; i < lines.length; i++) {
+  // Stop parsing at answer key section if found
+  const parseEndIndex = answerKeyStartIndex >= 0 ? answerKeyStartIndex - 1 : lines.length;
+  
+  for (let i = 0; i < parseEndIndex; i++) {
     const line = lines[i];
     const stripped = line.trim().replace(/^[\uFEFF\u200B-\u200F]+/, '');
     
@@ -192,6 +366,7 @@ function parseQuizText(text) {
       if (text.match(/^\d+/) || QUESTION_NUM_RE.test(text)) {
         flushQuestion();
         currentQuestion = { title: text };
+        currentQuestionNumber = extractQuestionNumber(text);
         continue;
       }
     }
@@ -224,6 +399,7 @@ function parseQuizText(text) {
       if (!OPTION_RE.test(stripped)) {
         flushQuestion();
         currentQuestion = { title: stripMarkdown(stripped) };
+        currentQuestionNumber = extractQuestionNumber(stripped);
         continue;
       }
     }
@@ -255,7 +431,10 @@ function parseQuizText(text) {
   
   flushQuestion();
   
-  return sections.filter(s => s.questions.length > 0);
+  return {
+    sections: sections.filter(s => s.questions.length > 0),
+    debug: debug
+  };
 }
 
 // ============ FORM BUILDER ============
