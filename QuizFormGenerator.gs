@@ -85,7 +85,8 @@ function parseAnswerKey(lines, startIndex) {
   const ANSWER_LINE_RE = /^(\d+)\s*[\.:)]\s*(.+)$/;
   
   for (let i = startIndex; i < lines.length; i++) {
-    const line = lines[i].trim();
+    // Strip BOM and invisible directionality chars (same as main parser)
+    const line = lines[i].trim().replace(/^[\uFEFF\u200B-\u200F]+/, '');
     if (!line || line.match(/^[_-]{3,}$/)) continue;
     
     const match = line.match(ANSWER_LINE_RE);
@@ -99,10 +100,11 @@ function parseAnswerKey(lines, startIndex) {
         answers[qNum] = letterMatch[1].toUpperCase();
       } else {
         // For True/False or short answer, use the full text
-        // But clean up any trailing explanation in parentheses for T/F
-        const tfMatch = answerText.match(/^(true|false)\b/i);
+        // Handle T/F as single letter or full word (e.g., "T – explanation", "True", "False")
+        const tfMatch = answerText.match(/^(true|false|t|f)\b/i);
         if (tfMatch) {
-          answers[qNum] = tfMatch[1].charAt(0).toUpperCase() + tfMatch[1].slice(1).toLowerCase();
+          const raw = tfMatch[1].toLowerCase();
+          answers[qNum] = (raw === 't' || raw === 'true') ? 'True' : 'False';
         } else {
           answers[qNum] = answerText;
         }
@@ -124,8 +126,8 @@ function parseQuizText(text) {
   let currentAnswer = null;
   let currentQuestionNumber = null;
   
-  // Answer key header detection
-  const ANSWER_KEY_HEADER_RE = /^(?:answer\s*key|answers?)\s*$/i;
+  // Answer key header detection (supports plain text and Markdown headings like "## Answer Key")
+  const ANSWER_KEY_HEADER_RE = /^#{0,6}\s*(?:\*\*)?(?:answer\s*key|answers?)(?:\*\*)?\s*$/i;
   
   // First pass: find answer key section and parse it
   let answerKeyStartIndex = -1;
