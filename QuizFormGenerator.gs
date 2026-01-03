@@ -49,6 +49,11 @@ function previewQuiz() {
     
     // Debug info
     preview += '=== DEBUG INFO ===\n';
+    if (result.debug.multipleAnswerKeysWarning) {
+      preview += '⚠️ WARNING: Multiple answer key sections detected!\n';
+      preview += 'Only the first answer key will be used.\n';
+      preview += 'Split into separate documents for multiple quizzes.\n\n';
+    }
     preview += `Answer Key Found: ${result.debug.answerKeyFound ? 'YES at line ' + result.debug.answerKeyLine : 'NO'}\n`;
     const answerCount = Object.keys(result.debug.answerKeyMap).filter(k => !k.startsWith('_')).length;
     preview += `Answers Parsed: ${answerCount}\n`;
@@ -204,13 +209,19 @@ function parseQuizTextWithDebug(text) {
   // Answer key header detection (supports plain text and Markdown headings like "## Answer Key")
   const ANSWER_KEY_HEADER_RE = /^#{0,6}\s*(?:\*\*)?(?:answer\s*key|answers?)(?:\*\*)?\s*$/i;
   
-  // First pass: find answer key section and parse it
+  // First pass: find answer key section(s) and parse the first one
   let answerKeyStartIndex = -1;
+  let multipleAnswerKeysFound = false;
   for (let i = 0; i < lines.length; i++) {
     const stripped = lines[i].trim();
     if (ANSWER_KEY_HEADER_RE.test(stripped)) {
-      answerKeyStartIndex = i + 1;
-      break;
+      if (answerKeyStartIndex === -1) {
+        answerKeyStartIndex = i + 1;
+      } else {
+        // Found a second answer key section
+        multipleAnswerKeysFound = true;
+        break;
+      }
     }
   }
   
@@ -220,7 +231,8 @@ function parseQuizTextWithDebug(text) {
   const debug = {
     answerKeyFound: answerKeyStartIndex >= 0,
     answerKeyLine: answerKeyStartIndex,
-    answerKeyMap: answerKeyMap
+    answerKeyMap: answerKeyMap,
+    multipleAnswerKeysWarning: multipleAnswerKeysFound
   };
   
   // Markdown heading (for .md files)
